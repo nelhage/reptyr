@@ -11,6 +11,8 @@
 #include <sys/mman.h>
 #include <assert.h>
 
+#include "ptrace.h"
+
 #ifdef __amd64__
 #include "arch/amd64.h"
 #else
@@ -22,22 +24,6 @@
 #endif
 
 #define offsetof(a, b) __builtin_offsetof(a,b)
-
-enum child_state {
-    ptrace_detached = 0,
-    ptrace_at_syscall,
-    ptrace_after_syscall,
-    ptrace_running,
-    ptrace_stopped,
-    ptrace_exited
-};
-
-struct ptrace_child {
-    pid_t pid;
-    struct user user;
-    enum child_state state;
-    int status;
-};
 
 int ptrace_wait(struct ptrace_child *child);
 
@@ -159,6 +145,7 @@ void reset_user_struct(struct user *user) {
     user->regs.reg_ax = user->regs.orig_ax;
 }
 
+#ifdef BUILD_PTRACE_MAIN
 int main(int argc, char **argv) {
     struct ptrace_child child;
     pid_t pid;
@@ -182,3 +169,4 @@ int main(int argc, char **argv) {
 
     return 0;
 }
+#endif
