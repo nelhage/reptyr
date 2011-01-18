@@ -13,15 +13,11 @@
 
 #include "ptrace.h"
 
-#ifdef __amd64__
-#include "arch/amd64.h"
-#else
-#include "arch/i386.h"
-#endif
+#define min(x, y) ({				\
+	typeof(x) _min1 = (x);			\
+	typeof(y) _min2 = (y);			\
+	_min1 < _min2 ? _min1 : _min2; })
 
-#ifndef mmap_syscall
-#define mmap_syscall __NR_mmap
-#endif
 
 #define offsetof(a, b) __builtin_offsetof(a,b)
 
@@ -102,8 +98,21 @@ int ptrace_advance_to_state(struct ptrace_child *child,
     return 0;
 }
 
+
+static void reset_user_struct(struct user *user) {
+    user->regs.reg_ip -= 2;
+    user->regs.reg_ax = user->regs.orig_ax;
+}
+
 int ptrace_save_regs(struct ptrace_child *child) {
-    return ptrace(PTRACE_GETREGS, child->pid, 0, &child->user);
+    int err;
+    err = ptrace_advance_to_state(child, ptrace_at_syscall);
+    if (err)
+        return err;
+    err = ptrace(PTRACE_GETREGS, child->pid, 0, &child->user);
+    if (!err)
+        reset_user_struct(&child->user);
+    return err;
 }
 
 int ptrace_restore_regs(struct ptrace_child *child) {
@@ -115,6 +124,7 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
                                     unsigned long p0, unsigned long p1,
                                     unsigned long p2, unsigned long p3,
                                     unsigned long p4, unsigned long p5) {
+    unsigned long rv;
     assert(!ptrace_advance_to_state(child, ptrace_at_syscall));
 
 #define setreg(r, v) do {                                               \
@@ -133,17 +143,63 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
     setreg(syscall_arg3, p3);
     setreg(syscall_arg4, p4);
     setreg(syscall_arg5, p5);
-#undef setreg
 
     assert(!ptrace_advance_to_state(child, ptrace_after_syscall));
 
-    return ptrace(PTRACE_PEEKUSER, child->pid, offsetof(struct user, regs.reg_ax));
+    rv = ptrace(PTRACE_PEEKUSER, child->pid, offsetof(struct user, regs.reg_ax));
+
+    setreg(reg_ax, child->user.regs.orig_ax);
+    setreg(reg_ip, child->user.regs.reg_ip);
+
+    #undef setreg
+
+    return rv;
 }
 
-void reset_user_struct(struct user *user) {
-    user->regs.reg_ip -= 2;
-    user->regs.reg_ax = user->regs.orig_ax;
+int ptrace_memcpy_to_child(struct ptrace_child *child, child_addr_t dst, void *src, size_t n) {
+    int err;
+    unsigned long scratch;
+
+    while (n >= sizeof(unsigned long)) {
+        if ((err = ptrace(PTRACE_POKEDATA, child->pid, dst, *((unsigned long*)src))) < 0)
+            return err;
+        dst += sizeof(unsigned long);
+        src += sizeof(unsigned long);
+        n -= sizeof(unsigned long);
+    }
+
+    if (n) {
+        errno = 0;
+        scratch = ptrace(PTRACE_PEEKDATA, child->pid, dst);
+        if (errno)
+            return -1;
+        memcpy(&scratch, src, n);
+        if ((err = ptrace(PTRACE_POKEDATA, child->pid, dst, scratch)) < 0)
+            return err;
+    }
+
+    return 0;
 }
+
+int ptrace_memcpy_from_child(struct ptrace_child *child, void *dst, child_addr_t src, size_t n) {
+    unsigned long scratch;
+
+    while (n) {
+        errno = 0;
+        scratch = ptrace(PTRACE_PEEKDATA, child->pid, src);
+        if (errno) return -1;
+        memcpy(dst, &scratch, min(n, sizeof(unsigned long)));
+
+        dst += sizeof(unsigned long);
+        src += sizeof(unsigned long);
+        if (n >= sizeof(unsigned long))
+            n -= sizeof(unsigned long);
+        else
+            n = 0;
+    }
+    return 0;
+}
+
 
 #ifdef BUILD_PTRACE_MAIN
 int main(int argc, char **argv) {
