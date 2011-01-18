@@ -120,9 +120,9 @@ int main(int argc, char **argv) {
 
     if (argc > 1) {
         pid_t child = atoi(argv[1]);
-        if (attach_child(child,
-                         ptsname(pty))) {
-            perror("Attaching to child");
+        int err;
+        if ((err = attach_child(child, ptsname(pty)))) {
+            fprintf(stderr, "Attaching to child: %s\n", strerror(-err));
             return 1;
         }
     } else {
