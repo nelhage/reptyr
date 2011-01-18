@@ -1,0 +1,13 @@
+Attaching:
+ - Find an fd corresponding to the tty in the child
+ - Open the new pty in the child
+ - Copy the termios settings over
+ - dup() it over the old ones
+ - Make the new tty the controlling tty:
+  - Fork a dummy child
+  - Find all processes in the child's process group.
+   - For each one, move them to the dummy child's process group
+  - Make the child setsid()
+  - Set the terminal as the controlling tty
+ - Close the newly allocated tty
+ - Detach
