@@ -173,7 +173,9 @@ int attach_child(pid_t pid, const char *pty) {
     if (err < 0)
         goto out_kill;
 
-    if (ptrace_save_regs(&dummy)) {
+    dummy.state = ptrace_after_syscall;
+    memcpy(&dummy.user, &child.user, sizeof child.user);
+    if (ptrace_restore_regs(&dummy)) {
         err = errno;
         goto out_kill;
     }
