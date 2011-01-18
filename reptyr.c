@@ -120,7 +120,8 @@ int main(int argc, char **argv) {
         die("Unable to unlockpt: %m");
 
     if (argc > 1) {
-        if (attach_child(atoi(argv[1]),
+        pid_t child = atoi(argv[1]);
+        if (attach_child(child,
                          ptsname(pty))) {
             perror("Attaching to child");
             return 1;

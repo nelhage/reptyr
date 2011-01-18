@@ -25,16 +25,22 @@ int ptrace_wait(struct ptrace_child *child);
 
 int ptrace_attach_child(struct ptrace_child *child, pid_t pid) {
     int err = 0;
+    if ((err = ptrace(PTRACE_ATTACH, pid)) < 0)
+        return err;
+
+    return ptrace_finish_attach(child, pid);
+}
+
+int ptrace_finish_attach(struct ptrace_child *child, pid_t pid) {
+    int err;
 
     memset(child, 0, sizeof child);
     child->pid = pid;
 
-    if ((err = ptrace(PTRACE_ATTACH, pid)) < 0)
-        return err;
-
     ptrace_wait(child);
 
-    if ((err = ptrace(PTRACE_SETOPTIONS, pid, 0, PTRACE_O_TRACESYSGOOD)) < 0)
+    if ((err = ptrace(PTRACE_SETOPTIONS, pid, 0,
+                      PTRACE_O_TRACESYSGOOD|PTRACE_O_TRACEFORK)) < 0)
         goto detach;
 
     return err;
@@ -59,11 +65,15 @@ int ptrace_wait(struct ptrace_child *child) {
     if (WIFEXITED(child->status) || WIFSIGNALED(child->status)) {
         child->state = ptrace_exited;
     } else if(WIFSTOPPED(child->status)) {
-        if (WSTOPSIG(child->status) & 0x80) {
+        int sig = WSTOPSIG(child->status);
+        if (sig & 0x80) {
             child->state = (child->state == ptrace_at_syscall) ?
                 ptrace_after_syscall : ptrace_at_syscall;
         } else {
-            child->state = ptrace_stopped;
+            if (sig == SIGTRAP && (((child->status >> 8) & PTRACE_EVENT_FORK) == PTRACE_EVENT_FORK))
+                ptrace(PTRACE_GETEVENTMSG, child->pid, 0, &child->forked_pid);
+            if (child->state != ptrace_at_syscall)
+                child->state = ptrace_stopped;
         }
     } else {
         errno = EINVAL;

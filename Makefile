@@ -1,7 +1,7 @@
-CFLAGS=-Wall -Werror
+CFLAGS=-Wall -Werror -D_GNU_SOURCE -g
 STUB_CFLAGS=$(CFLAGS) -nostdlib -Wl,-r -fomit-frame-pointer
 
-all: reptyr stub.o
+all: reptyr
 
 reptyr: reptyr.o ptrace.o attach.o
 

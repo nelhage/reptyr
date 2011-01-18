@@ -26,12 +26,14 @@ struct ptrace_child {
     struct user user;
     enum child_state state;
     int status;
+    unsigned long forked_pid;
 };
 
 typedef unsigned long child_addr_t;
 
 int ptrace_wait(struct ptrace_child *child);
 int ptrace_attach_child(struct ptrace_child *child, pid_t pid);
+int ptrace_finish_attach(struct ptrace_child *child, pid_t pid);
 int ptrace_detach_child(struct ptrace_child *child);
 int ptrace_wait(struct ptrace_child *child);
 int ptrace_advance_to_state(struct ptrace_child *child,

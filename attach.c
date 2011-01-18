@@ -9,6 +9,8 @@
 #include <errno.h>
 #include <termios.h>
 #include <sys/ioctl.h>
+#include <signal.h>
+#include <limits.h>
 
 #include "ptrace.h"
 
@@ -48,10 +50,11 @@ int *get_child_tty_fds(struct ptrace_child *child, int *count) {
         if (len < 0)
             continue;
         buf[len] = 0;
-        if (strcmp(buf, child_tty) == 0) {
+        if (strcmp(buf, child_tty) == 0
+            || strcmp(buf, "/dev/tty") == 0) {
             if (n == allocated) {
                 allocated = allocated ? 2 * allocated : 2;
-                fds = realloc(fds, allocated);
+                fds = realloc(fds, sizeof(int) * allocated);
                 if (!fds)
                     goto out;
             }
@@ -65,12 +68,40 @@ int *get_child_tty_fds(struct ptrace_child *child, int *count) {
     return fds;
 }
 
+void move_process_group(struct ptrace_child *from, pid_t to) {
+    DIR *dir;
+    struct dirent *d;
+    pid_t pid;
+    char *p;
+    int err;
+
+    if ((dir = opendir("/proc/")) == NULL)
+        return;
+
+    while ((d = readdir(dir)) != NULL) {
+        if(d->d_name[0] == '.') continue;
+        pid = strtol(d->d_name, &p, 10);
+        if (*p) continue;
+        if (getpgid(pid) == from->pid) {
+            debug("Change pgid for pid %d", pid);
+            err = ptrace_remote_syscall(from, __NR_setpgid,
+                                        pid, to,
+                                        0, 0, 0, 0);
+            if (err < 0)
+                debug(" failed: %s", strerror(-err));
+        }
+    }
+    closedir(dir);
+}
+
 int attach_child(pid_t pid, const char *pty) {
     struct ptrace_child child;
     unsigned long scratch_page = -1;
     int *child_tty_fds = NULL, n_fds, child_fd;
     int i;
     int err = 0;
+    struct ptrace_child dummy;
+
 
     if (ptrace_attach_child(&child, pid))
         return errno;
@@ -131,12 +162,65 @@ int attach_child(pid_t pid, const char *pty) {
 
     debug("Copied terminal settings");
 
+    err = ptrace_remote_syscall(&child, __NR_fork,
+                                 0, 0, 0, 0, 0, 0);
+    if (err < 0)
+        goto out_close;
+
+    debug("Forked a child: %d", child.forked_pid);
+
+    err = ptrace_finish_attach(&dummy, child.forked_pid);
+    if (err < 0)
+        goto out_kill;
+
+    if (ptrace_save_regs(&dummy)) {
+        err = errno;
+        goto out_kill;
+    }
+
+    err = ptrace_remote_syscall(&dummy, __NR_setpgid,
+                                0, 0, 0, 0, 0, 0);
+    if (err < 0) {
+        debug("Failed to setpgid: %s", strerror(-err));
+        goto out_kill;
+    }
+
+    move_process_group(&child, dummy.pid);
+
+    err = ptrace_remote_syscall(&child, __NR_setsid,
+                                0, 0, 0, 0, 0, 0);
+    if (err < 0) {
+        debug("Failed to setsid: %s", strerror(-err));
+        goto out_kill;
+    }
+
+    debug("Did setsid()");
+
+    err = ptrace_remote_syscall(&child, __NR_ioctl,
+                                child_fd, TIOCSCTTY,
+                                0, 0, 0, 0);
+    if (err < 0)
+        goto out_kill;
+
+    debug("Set the controlling tty");
+
     for (i = 0; i < n_fds; i++)
         ptrace_remote_syscall(&child, __NR_dup2,
                               child_fd, child_tty_fds[i],
                               0, 0, 0, 0);
 
+    ptrace_remote_syscall(&child, __NR_signal,
+                          SIGHUP, (unsigned long)SIG_IGN,
+                          0, 0, 0, 0);
+
     err = 0;
+
+ out_kill:
+    kill(dummy.pid, SIGKILL);
+    ptrace_wait(&dummy);
+    ptrace_remote_syscall(&child, __NR_waitpid,
+                          dummy.pid, 0, WNOHANG,
+                          0, 0, 0);
 
  out_close:
     ptrace_remote_syscall(&child, __NR_close, child_fd,
@@ -150,6 +234,9 @@ int attach_child(pid_t pid, const char *pty) {
     ptrace_restore_regs(&child);
  out_detach:
     ptrace_detach_child(&child);
+
+    if (err == 0)
+        kill(child.pid, SIGWINCH);
 
     return err;
 }
