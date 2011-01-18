@@ -44,5 +44,5 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
                                     unsigned long p2, unsigned long p3,
                                     unsigned long p4, unsigned long p5);
 
-int ptrace_memcpy_to_child(struct ptrace_child *, child_addr_t, void*, size_t);
+int ptrace_memcpy_to_child(struct ptrace_child *, child_addr_t, const void*, size_t);
 int ptrace_memcpy_from_child(struct ptrace_child *, void*, child_addr_t, size_t);

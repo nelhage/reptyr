@@ -156,7 +156,7 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
     return rv;
 }
 
-int ptrace_memcpy_to_child(struct ptrace_child *child, child_addr_t dst, void *src, size_t n) {
+int ptrace_memcpy_to_child(struct ptrace_child *child, child_addr_t dst, const void *src, size_t n) {
     int err;
     unsigned long scratch;
 
