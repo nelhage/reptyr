@@ -225,9 +225,11 @@ int attach_child(pid_t pid, const char *pty) {
                                      &act, sizeof act);
         if (err < 0)
             goto out_kill;
-        ptrace_remote_syscall(&child, __NR_rt_sigaction,
-                              SIGHUP, scratch_page,
-                              0, sizeof(sigset_t), 0, 0);
+        err = ptrace_remote_syscall(&child, __NR_rt_sigaction,
+                                    SIGHUP, scratch_page,
+                                    0, 8, 0, 0);
+        if (err < 0)
+            goto out_kill;
         
     }
 #endif
