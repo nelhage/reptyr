@@ -12,6 +12,8 @@
 #include <termios.h>
 #include <signal.h>
 
+int attach_child(pid_t pid, const char *pty);
+
 void die(const char *msg, ...) {
     char buf[8192];
     va_list ap;
@@ -21,6 +23,16 @@ void die(const char *msg, ...) {
 
     fprintf(stderr, "%s\n", buf);
     exit(1);
+}
+
+void debug(const char *msg, ...) {
+    char buf[8192];
+    va_list ap;
+    va_start(ap, msg);
+    vsnprintf(buf, sizeof buf, msg, ap);
+    va_end(ap);
+
+    fprintf(stderr, "[+] %s\n", buf);
 }
 
 void setup_raw(struct termios *save) {
@@ -106,7 +118,16 @@ int main(int argc, char **argv) {
         die("Unable to unlockpt: %m");
     if (grantpt(pty) < 0)
         die("Unable to unlockpt: %m");
-    printf("Opened a new pty: %s\n", ptsname(pty));
+
+    if (argc > 1) {
+        if (attach_child(atoi(argv[1]),
+                         ptsname(pty))) {
+            perror("Attaching to child");
+            return 1;
+        }
+    } else {
+        printf("Opened a new pty: %s\n", ptsname(pty));
+    }
 
     setup_raw(&saved_termios);
     resize_pty(pty);
@@ -114,7 +135,6 @@ int main(int argc, char **argv) {
     act.sa_handler = do_winch;
     act.sa_flags   = 0;
     sigaction(SIGWINCH, &act, NULL);
-    
     do_proxy(pty);
     tcsetattr(0, TCSANOW, &saved_termios);
 
