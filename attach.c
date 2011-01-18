@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <termios.h>
 #include <sys/ioctl.h>
+#include <sys/wait.h>
 #include <signal.h>
 #include <limits.h>
 
@@ -211,18 +212,34 @@ int attach_child(pid_t pid, const char *pty) {
                               child_fd, child_tty_fds[i],
                               0, 0, 0, 0);
 
+#ifdef __NR_signal
     ptrace_remote_syscall(&child, __NR_signal,
                           SIGHUP, (unsigned long)SIG_IGN,
                           0, 0, 0, 0);
+#else
+    {
+        struct sigaction act = {
+            .sa_handler = SIG_IGN,
+        };
+        err = ptrace_memcpy_to_child(&child, scratch_page,
+                                     &act, sizeof act);
+        if (err < 0)
+            goto out_kill;
+        ptrace_remote_syscall(&child, __NR_rt_sigaction,
+                              SIGHUP, scratch_page,
+                              0, sizeof(sigset_t), 0, 0);
+        
+    }
+#endif
 
     err = 0;
 
  out_kill:
     kill(dummy.pid, SIGKILL);
     ptrace_wait(&dummy);
-    ptrace_remote_syscall(&child, __NR_waitpid,
-                          dummy.pid, 0, WNOHANG,
-                          0, 0, 0);
+    ptrace_remote_syscall(&child, __NR_waitid,
+                          P_PID, dummy.pid, 0, WNOHANG,
+                          0, 0);
 
  out_close:
     ptrace_remote_syscall(&child, __NR_close, child_fd,
