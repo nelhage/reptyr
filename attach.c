@@ -3,71 +3,153 @@
 #include <sys/syscall.h>
 #include <sys/mman.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <termios.h>
+#include <sys/ioctl.h>
 
 #include "ptrace.h"
 
 extern void debug(const char *msg, ...);
 
-static void do_unmap(struct ptrace_child *child, unsigned long addr, int pages) {
+static void do_unmap(struct ptrace_child *child, child_addr_t addr, int pages) {
     if (addr == (unsigned long)-1)
         return;
     ptrace_remote_syscall(child, __NR_munmap, addr, pages, 0, 0, 0, 0);
 }
 
-extern char child_stub_begin[], child_stub_end[];
+int *get_child_tty_fds(struct ptrace_child *child, int *count) {
+    char buf[PATH_MAX];
+    char child_tty[PATH_MAX];
+    int n = 0, allocated = 0;
+    int *fds = NULL;
+    DIR *dir;
+    ssize_t len;
+    struct dirent *d;
+
+    debug("Looking up fds for tty in child.");
+    snprintf(buf, sizeof buf, "/proc/%d/fd/0", child->pid);
+    len = readlink(buf, child_tty, PATH_MAX);
+    if(len < 0)
+        return NULL;
+
+    child_tty[len] = 0;
+    debug("Resolved child tty: %s", child_tty);
+
+    snprintf(buf, sizeof buf, "/proc/%d/fd/", child->pid);
+    if ((dir = opendir(buf)) == NULL)
+        return NULL;
+    while ((d = readdir(dir)) != NULL) {
+        if (d->d_name[0] == '.') continue;
+        snprintf(buf, sizeof buf, "/proc/%d/fd/%s", child->pid, d->d_name);
+        len = readlink(buf, buf, PATH_MAX);
+        if (len < 0)
+            continue;
+        buf[len] = 0;
+        if (strcmp(buf, child_tty) == 0) {
+            if (n == allocated) {
+                allocated = allocated ? 2 * allocated : 2;
+                fds = realloc(fds, allocated);
+                if (!fds)
+                    goto out;
+            }
+            debug("Found an alias for the tty: %s", d->d_name);
+            fds[n++] = atoi(d->d_name);
+        }
+    }
+ out:
+    *count = n;
+    closedir(dir);
+    return fds;
+}
 
 int attach_child(pid_t pid, const char *pty) {
     struct ptrace_child child;
-    unsigned long arg_page = -1,
-        stack_page = -1,
-        code_map   = -1;
-    int code_pages = 1;
+    unsigned long scratch_page = -1;
+    int *child_tty_fds = NULL, n_fds, child_fd;
+    int i;
+    int err = 0;
 
-    if (ptrace_attach_child(&child, pid)) {
-        perror("attach");
-        return -1;
+    if (ptrace_attach_child(&child, pid))
+        return errno;
+
+    if (ptrace_advance_to_state(&child, ptrace_at_syscall)) {
+        err = errno;
+        goto out_detach;
     }
-    if (ptrace_advance_to_state(&child, ptrace_at_syscall))
+    if (ptrace_save_regs(&child)) {
+        err = errno;
         goto out_detach;
-    if (ptrace_save_regs(&child))
-        goto out_detach;
+    }
 
-    arg_page = ptrace_remote_syscall(&child, mmap_syscall, 0,
-                                     PAGE_SIZE, PROT_READ|PROT_WRITE,
-                                     MAP_ANONYMOUS|MAP_PRIVATE, 0, 0);
+    scratch_page = ptrace_remote_syscall(&child, mmap_syscall, 0,
+                                         PAGE_SIZE, PROT_READ|PROT_WRITE,
+                                         MAP_ANONYMOUS|MAP_PRIVATE, 0, 0);
 
-    debug("Allocated argument page: %lx", arg_page);
-
-    stack_page = ptrace_remote_syscall(&child, mmap_syscall, 0,
-                                     PAGE_SIZE, PROT_READ|PROT_WRITE,
-                                     MAP_ANONYMOUS|MAP_PRIVATE, 0, 0);
-    debug("Allocated stack page: %lx", stack_page);
-
-    code_map = ptrace_remote_syscall(&child, mmap_syscall, 0,
-                                     code_pages * PAGE_SIZE,
-                                     PROT_READ|PROT_WRITE,
-                                     MAP_ANONYMOUS|MAP_PRIVATE, 0, 0);
-    debug("Allocated code buffer: %lx", code_map);
-
-    if (arg_page == (unsigned long)-1
-        || stack_page == (unsigned long)-1
-        || code_map   == (unsigned long)-1)
+    if (scratch_page > (unsigned long)-100) {
+        err = scratch_page;
         goto out_unmap;
+    }
 
-    if (ptrace_memcpy_to_child(&child, arg_page, pty, strlen(pty) + 1))
+    debug("Allocated scratch page: %lx", scratch_page);
+
+    child_tty_fds = get_child_tty_fds(&child, &n_fds);
+    if (!child_tty_fds) {
+        err = -1;
         goto out_unmap;
-    if (ptrace_memcpy_to_child(&child, code_map, child_stub_begin,
-                               child_stub_end - child_stub_begin + 1))
-        goto out_unmap;
+    }
+
+    if (ptrace_memcpy_to_child(&child, scratch_page, pty, strlen(pty)+1)) {
+        err = errno;
+        goto out_free_fds;
+    }
+
+    child_fd = ptrace_remote_syscall(&child, __NR_open,
+                                     scratch_page, O_RDWR|O_NOCTTY,
+                                     0, 0, 0, 0);
+    if (child_fd < 0) {
+        err = child_fd;
+        goto out_free_fds;
+    }
+
+    debug("Opened the new tty in the child: %d", child_fd);
+
+    err = ptrace_remote_syscall(&child, __NR_ioctl,
+                                child_tty_fds[0], TCGETS, scratch_page,
+                                0, 0, 0);
+    debug("TCGETS(%d): %d", child_tty_fds[0], err);
+    if(err < 0)
+        goto out_close;
+    err = ptrace_remote_syscall(&child, __NR_ioctl,
+                                child_fd, TCSETS, scratch_page,
+                                0, 0, 0);
+    debug("TCSETS: %d", err);
+    if (err < 0)
+        goto out_close;
+
+    debug("Copied terminal settings");
+
+    for (i = 0; i < n_fds; i++)
+        ptrace_remote_syscall(&child, __NR_dup2,
+                              child_fd, child_tty_fds[i],
+                              0, 0, 0, 0);
+
+    err = 0;
+
+ out_close:
+    ptrace_remote_syscall(&child, __NR_close, child_fd,
+                          0, 0, 0, 0, 0);
+ out_free_fds:
+    free(child_tty_fds);
 
  out_unmap:
-    do_unmap(&child, arg_page, 1);
-    do_unmap(&child, stack_page, 1);
-    do_unmap(&child, code_map, code_pages);
+    do_unmap(&child, scratch_page, 1);
 
     ptrace_restore_regs(&child);
  out_detach:
     ptrace_detach_child(&child);
 
-    return -1;
+    return err;
 }
