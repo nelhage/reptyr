@@ -74,6 +74,8 @@ int ptrace_wait(struct ptrace_child *child) {
                 ptrace(PTRACE_GETEVENTMSG, child->pid, 0, &child->forked_pid);
             if (child->state != ptrace_at_syscall)
                 child->state = ptrace_stopped;
+            if (sig != SIGSTOP && sig != SIGTRAP && sig != SIGCHLD)
+                return -1;
         }
     } else {
         errno = EINVAL;
