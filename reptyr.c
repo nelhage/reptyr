@@ -106,10 +106,33 @@ void do_proxy(int pty) {
     }
 }
 
+void usage(char *me) {
+    fprintf(stderr, "Usage: %s [-l | PID]\n", me);
+}
+
 int main(int argc, char **argv) {
     struct termios saved_termios;
     struct sigaction act;
     int pty;
+    int do_attach = 1;
+
+    if (argc < 2) {
+        usage(argv[0]);
+        return 2;
+    }
+    if(argv[1][0] == '-') {
+        switch(argv[1][1]) {
+        case 'h':
+            usage(argv[0]);
+            return 0;
+        case 'l':
+            do_attach = 0;
+            break;
+        default:
+            usage(argv[0]);
+            return 1;
+        }
+    }
 
     if ((pty = open("/dev/ptmx", O_RDWR|O_NOCTTY)) < 0)
         die("Unable to open /dev/ptmx: %m");
@@ -118,7 +141,7 @@ int main(int argc, char **argv) {
     if (grantpt(pty) < 0)
         die("Unable to unlockpt: %m");
 
-    if (argc > 1) {
+    if (do_attach) {
         pid_t child = atoi(argv[1]);
         int err;
         if ((err = attach_child(child, ptsname(pty)))) {
