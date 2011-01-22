@@ -124,6 +124,24 @@ void usage(char *me) {
     fprintf(stderr, "Usage: %s [-l | PID]\n", me);
 }
 
+void check_yama_ptrace_scope(void) {
+    int fd = open("/proc/sys/kernel/yama/ptrace_scope", O_RDONLY);
+    if (fd >= 0) {
+        char buf[256];
+        int n;
+        n = read(fd, buf, sizeof buf);
+        if (n > 0) {
+            if (!atoi(buf)) {
+                return;
+            }
+        }
+    } else if(errno == ENOENT)
+        return;
+    fprintf(stderr, "The kernel denied permission while attaching. If your uid matches\n");
+    fprintf(stderr, "the target's, check the value of /proc/sys/kernel/yama/ptrace_scope.\n");
+    fprintf(stderr, "For more information, see /etc/sysctl.d/10-ptrace.conf\n");
+}
+
 int main(int argc, char **argv) {
     struct termios saved_termios;
     struct sigaction act;
@@ -160,6 +178,9 @@ int main(int argc, char **argv) {
         int err;
         if ((err = attach_child(child, ptsname(pty)))) {
             fprintf(stderr, "Unable to attach to pid %d: %s\n", child, strerror(err));
+            if (err == EPERM) {
+                check_yama_ptrace_scope();
+            }
             return 1;
         }
     } else {
