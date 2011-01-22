@@ -11,27 +11,37 @@
 #include <termios.h>
 #include <signal.h>
 
-int attach_child(pid_t pid, const char *pty);
+#include "reptyr.h"
+
+void _debug(const char *pfx, const char *msg, va_list ap) {
+
+    if (pfx)
+        fprintf(stderr, "%s", pfx);
+    vfprintf(stderr, msg, ap);
+    fprintf(stderr, "\n");
+}
 
 void die(const char *msg, ...) {
-    char buf[8192];
     va_list ap;
     va_start(ap, msg);
-    vsnprintf(buf, sizeof buf, msg, ap);
+    _debug("[!] ", msg, ap);
     va_end(ap);
 
-    fprintf(stderr, "%s\n", buf);
     exit(1);
 }
 
 void debug(const char *msg, ...) {
-    char buf[8192];
     va_list ap;
     va_start(ap, msg);
-    vsnprintf(buf, sizeof buf, msg, ap);
+    _debug("[+] ", msg, ap);
     va_end(ap);
+}
 
-    fprintf(stderr, "[+] %s\n", buf);
+void error(const char *msg, ...) {
+    va_list ap;
+    va_start(ap, msg);
+    _debug("[-] ", msg, ap);
+    va_end(ap);
 }
 
 void setup_raw(struct termios *save) {

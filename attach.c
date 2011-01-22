@@ -14,8 +14,7 @@
 #include <limits.h>
 
 #include "ptrace.h"
-
-extern void debug(const char *msg, ...);
+#include "reptyr.h"
 
 static void do_unmap(struct ptrace_child *child, child_addr_t addr, int pages) {
     if (addr == (unsigned long)-1)
