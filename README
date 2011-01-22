@@ -82,6 +82,12 @@ actually changes the controlling terminal of the process you are
 attaching. I plan on writing up more about just how this works soon,
 but for now, the source is only about 1000 lines if you're curious :)
 
+PRONUNCIATION
+-------------
+
+I pronounce it like "repeater", but since that's easily ambiguous,
+"re-P-T-Y-er" is also acceptable.
+
 
 CREDITS
 -------
