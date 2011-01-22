@@ -50,6 +50,17 @@ reptyr fixes all of these problems, and is the only such tool I know
 of that does so. See below for some more details on how it
 accomplishes this.
 
+ptrace_scope on Ubuntu Maverick and up
+--------------------------------------
+
+`reptyr` depends on the `ptrace` system call to attach to the remote program. On
+Ubuntu Maverick and higher, this ability is disabled by default for security
+reasons. You can enable it temporarily by doing
+
+ # echo 0 > /proc/sys/kernel/yama/ptrace_scope
+
+as root, or permanently by editing the file /etc/sysctl.d/10-ptrace.conf, which
+also contains more information about exactly what this setting accomplishes.
 
 reptyr -l
 ---------
