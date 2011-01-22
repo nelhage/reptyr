@@ -10,6 +10,7 @@
 #include <sys/syscall.h>
 #include <sys/mman.h>
 #include <assert.h>
+#include <stddef.h>
 
 #include "ptrace.h"
 
@@ -18,8 +19,6 @@
 	typeof(y) _min2 = (y);			\
 	_min1 < _min2 ? _min1 : _min2; })
 
-
-#define offsetof(a, b) __builtin_offsetof(a,b)
 
 static long __ptrace_command(struct ptrace_child *child, enum __ptrace_request req,
                              void *, void*);
