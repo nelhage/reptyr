@@ -88,7 +88,7 @@ void move_process_group(struct ptrace_child *from, pid_t to) {
                                         pid, to,
                                         0, 0, 0, 0);
             if (err < 0)
-                debug(" failed: %s", strerror(-err));
+                error(" failed: %s", strerror(-err));
         }
     }
     closedir(dir);
@@ -183,7 +183,7 @@ int attach_child(pid_t pid, const char *pty) {
     err = ptrace_remote_syscall(&dummy, __NR_setpgid,
                                 0, 0, 0, 0, 0, 0);
     if (err < 0) {
-        debug("Failed to setpgid: %s", strerror(-err));
+        error("Failed to setpgid: %s", strerror(-err));
         goto out_kill;
     }
 
@@ -192,7 +192,7 @@ int attach_child(pid_t pid, const char *pty) {
     err = ptrace_remote_syscall(&child, __NR_setsid,
                                 0, 0, 0, 0, 0, 0);
     if (err < 0) {
-        debug("Failed to setsid: %s", strerror(-err));
+        error("Failed to setsid: %s", strerror(-err));
         goto out_kill;
     }
 
@@ -258,5 +258,5 @@ int attach_child(pid_t pid, const char *pty) {
     if (err == 0)
         kill(child.pid, SIGWINCH);
 
-    return err;
+    return err < 0 ? -err : err;
 }
