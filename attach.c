@@ -94,13 +94,84 @@ void move_process_group(struct ptrace_child *child, pid_t from, pid_t to) {
     closedir(dir);
 }
 
+int do_setsid(struct ptrace_child *child) {
+    int err = 0;
+    struct ptrace_child dummy;
+
+    err = ptrace_remote_syscall(child, __NR_fork,
+                                0, 0, 0, 0, 0, 0);
+    if (err < 0)
+        return err;
+
+    debug("Forked a child: %d", child->forked_pid);
+
+    err = ptrace_finish_attach(&dummy, child->forked_pid);
+    if (err < 0)
+        goto out_kill;
+
+    dummy.state = ptrace_after_syscall;
+    memcpy(&dummy.user, &child->user, sizeof child->user);
+    if (ptrace_restore_regs(&dummy)) {
+        err = dummy.error;
+        goto out_kill;
+    }
+
+    err = ptrace_remote_syscall(&dummy, __NR_setpgid,
+                                0, 0, 0, 0, 0, 0);
+    if (err < 0) {
+        error("Failed to setpgid: %s", strerror(-err));
+        goto out_kill;
+    }
+
+    move_process_group(child, child->pid, dummy.pid);
+
+    err = ptrace_remote_syscall(child, __NR_setsid,
+                                0, 0, 0, 0, 0, 0);
+    if (err < 0) {
+        error("Failed to setsid: %s", strerror(-err));
+        move_process_group(child, dummy.pid, child->pid);
+        goto out_kill;
+    }
+
+    debug("Did setsid()");
+
+ out_kill:
+    kill(dummy.pid, SIGKILL);
+    ptrace_detach_child(&dummy);
+    ptrace_wait(&dummy);
+    ptrace_remote_syscall(child, __NR_waitid,
+                          P_PID, dummy.pid, 0, WNOHANG,
+                          0, 0);
+    return err;
+}
+
+int ignore_hup(struct ptrace_child *child) {
+    int err;
+#ifdef __NR_signal
+    err = ptrace_remote_syscall(child, __NR_signal,
+                                SIGHUP, (unsigned long)SIG_IGN,
+                                0, 0, 0, 0);
+#else
+    struct sigaction act = {
+        .sa_handler = SIG_IGN,
+    };
+    err = ptrace_memcpy_to_child(child, scratch_page,
+                                 &act, sizeof act);
+    if (err < 0)
+        return err;
+    err = ptrace_remote_syscall(child, __NR_rt_sigaction,
+                                SIGHUP, scratch_page,
+                                0, 8, 0, 0);
+#endif
+    return err;
+}
+
 int attach_child(pid_t pid, const char *pty) {
     struct ptrace_child child;
     unsigned long scratch_page = -1;
     int *child_tty_fds = NULL, n_fds, child_fd;
     int i;
     int err = 0;
-    struct ptrace_child dummy;
 
 
     if (ptrace_attach_child(&child, pid))
@@ -162,48 +233,30 @@ int attach_child(pid_t pid, const char *pty) {
 
     debug("Copied terminal settings");
 
-    err = ptrace_remote_syscall(&child, __NR_fork,
-                                 0, 0, 0, 0, 0, 0);
+    err = ignore_hup(&child);
     if (err < 0)
         goto out_close;
 
-    debug("Forked a child: %d", child.forked_pid);
-
-    err = ptrace_finish_attach(&dummy, child.forked_pid);
+    err = ptrace_remote_syscall(&child, __NR_getsid,
+                                0, 0, 0, 0, 0, 0);
+    if (err != child.pid) {
+        debug("Target is not a session leader, attempting to setsid.");
+        err = do_setsid(&child);
+    } else {
+        ptrace_remote_syscall(&child, __NR_ioctl,
+                              child_tty_fds[0], TIOCNOTTY,
+                              0, 0, 0, 0);
+    }
     if (err < 0)
-        goto out_kill;
-
-    dummy.state = ptrace_after_syscall;
-    memcpy(&dummy.user, &child.user, sizeof child.user);
-    if (ptrace_restore_regs(&dummy)) {
-        err = dummy.error;
-        goto out_kill;
-    }
-
-    err = ptrace_remote_syscall(&dummy, __NR_setpgid,
-                                0, 0, 0, 0, 0, 0);
-    if (err < 0) {
-        error("Failed to setpgid: %s", strerror(-err));
-        goto out_kill;
-    }
-
-    move_process_group(&child, child.pid, dummy.pid);
-
-    err = ptrace_remote_syscall(&child, __NR_setsid,
-                                0, 0, 0, 0, 0, 0);
-    if (err < 0) {
-        error("Failed to setsid: %s", strerror(-err));
-        move_process_group(&child, dummy.pid, child.pid);
-        goto out_kill;
-    }
-
-    debug("Did setsid()");
+        goto out_close;
 
     err = ptrace_remote_syscall(&child, __NR_ioctl,
                                 child_fd, TIOCSCTTY,
                                 0, 0, 0, 0);
-    if (err < 0)
-        goto out_kill;
+    if (err < 0) {
+        error("Unable to set controlling terminal.");
+        goto out_close;
+    }
 
     debug("Set the controlling tty");
 
@@ -212,37 +265,8 @@ int attach_child(pid_t pid, const char *pty) {
                               child_fd, child_tty_fds[i],
                               0, 0, 0, 0);
 
-#ifdef __NR_signal
-    ptrace_remote_syscall(&child, __NR_signal,
-                          SIGHUP, (unsigned long)SIG_IGN,
-                          0, 0, 0, 0);
-#else
-    {
-        struct sigaction act = {
-            .sa_handler = SIG_IGN,
-        };
-        err = ptrace_memcpy_to_child(&child, scratch_page,
-                                     &act, sizeof act);
-        if (err < 0)
-            goto out_kill;
-        err = ptrace_remote_syscall(&child, __NR_rt_sigaction,
-                                    SIGHUP, scratch_page,
-                                    0, 8, 0, 0);
-        if (err < 0)
-            goto out_kill;
-        
-    }
-#endif
 
     err = 0;
-
- out_kill:
-    kill(dummy.pid, SIGKILL);
-    ptrace_detach_child(&dummy);
-    ptrace_wait(&dummy);
-    ptrace_remote_syscall(&child, __NR_waitid,
-                          P_PID, dummy.pid, 0, WNOHANG,
-                          0, 0);
 
  out_close:
     ptrace_remote_syscall(&child, __NR_close, child_fd,
