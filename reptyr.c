@@ -145,7 +145,7 @@ int main(int argc, char **argv) {
         pid_t child = atoi(argv[1]);
         int err;
         if ((err = attach_child(child, ptsname(pty)))) {
-            fprintf(stderr, "Attaching to child: %s\n", strerror(-err));
+            fprintf(stderr, "Unable to attach to pid %d: %s\n", child, strerror(err));
             return 1;
         }
     } else {

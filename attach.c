@@ -105,14 +105,14 @@ int attach_child(pid_t pid, const char *pty) {
 
 
     if (ptrace_attach_child(&child, pid))
-        return errno;
+        return child.error;
 
     if (ptrace_advance_to_state(&child, ptrace_at_syscall)) {
-        err = errno;
+        err = child.error;
         goto out_detach;
     }
     if (ptrace_save_regs(&child)) {
-        err = errno;
+        err = child.error;
         goto out_detach;
     }
 
@@ -120,8 +120,8 @@ int attach_child(pid_t pid, const char *pty) {
                                          PAGE_SIZE, PROT_READ|PROT_WRITE,
                                          MAP_ANONYMOUS|MAP_PRIVATE, 0, 0);
 
-    if (scratch_page > (unsigned long)-100) {
-        err = scratch_page;
+    if (scratch_page > (unsigned long)-1000) {
+        err = -(signed long)scratch_page;
         goto out_unmap;
     }
 
@@ -129,12 +129,12 @@ int attach_child(pid_t pid, const char *pty) {
 
     child_tty_fds = get_child_tty_fds(&child, &n_fds);
     if (!child_tty_fds) {
-        err = -1;
+        err = child.error;
         goto out_unmap;
     }
 
     if (ptrace_memcpy_to_child(&child, scratch_page, pty, strlen(pty)+1)) {
-        err = errno;
+        err = child.error;
         goto out_free_fds;
     }
 
@@ -177,7 +177,7 @@ int attach_child(pid_t pid, const char *pty) {
     dummy.state = ptrace_after_syscall;
     memcpy(&dummy.user, &child.user, sizeof child.user);
     if (ptrace_restore_regs(&dummy)) {
-        err = errno;
+        err = dummy.error;
         goto out_kill;
     }
 
