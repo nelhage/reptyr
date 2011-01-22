@@ -13,6 +13,10 @@
 
 #include "reptyr.h"
 
+#ifndef __linux__
+#error reptyr is currently Linux-only.
+#endif
+
 void _debug(const char *pfx, const char *msg, va_list ap) {
 
     if (pfx)
