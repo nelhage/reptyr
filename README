@@ -10,6 +10,8 @@ on home.
 USAGE
 -----
 
+  reptyr PID
+
 "reptyr PID" will grab the process with id PID and attach it to your
 current terminal.
 
