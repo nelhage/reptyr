@@ -205,6 +205,7 @@ int attach_child(pid_t pid, const char *pty) {
 
     if (ptrace_memcpy_to_child(&child, scratch_page, pty, strlen(pty)+1)) {
         err = child.error;
+        error("Unable to memcpy the pty path to child.");
         goto out_free_fds;
     }
 
@@ -213,6 +214,7 @@ int attach_child(pid_t pid, const char *pty) {
                                      0, 0, 0, 0);
     if (child_fd < 0) {
         err = child_fd;
+        error("Unable to open the tty in the child.");
         goto out_free_fds;
     }
 
