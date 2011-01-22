@@ -21,47 +21,54 @@
 
 #define offsetof(a, b) __builtin_offsetof(a,b)
 
+static long __ptrace_command(struct ptrace_child *child, enum __ptrace_request req,
+                             void *, void*);
+
+#define ptrace_command(cld, req, ...) _ptrace_command(cld, req, ## __VA_ARGS__, NULL, NULL)
+#define _ptrace_command(cld, req, addr, data, ...) __ptrace_command((cld), (req), (void*)(addr), (void*)(data))
+
 int ptrace_wait(struct ptrace_child *child);
 
 int ptrace_attach_child(struct ptrace_child *child, pid_t pid) {
-    int err = 0;
-    if ((err = ptrace(PTRACE_ATTACH, pid)) < 0)
-        return err;
+    memset(child, 0, sizeof child);
+    child->pid = pid;
+    if (ptrace_command(child, PTRACE_ATTACH) < 0)
+        return -1;
 
     return ptrace_finish_attach(child, pid);
 }
 
 int ptrace_finish_attach(struct ptrace_child *child, pid_t pid) {
-    int err;
-
     memset(child, 0, sizeof child);
     child->pid = pid;
 
-    ptrace_wait(child);
-
-    if ((err = ptrace(PTRACE_SETOPTIONS, pid, 0,
-                      PTRACE_O_TRACESYSGOOD|PTRACE_O_TRACEFORK)) < 0)
+    if (ptrace_wait(child) < 0)
         goto detach;
 
-    return err;
+    if (ptrace_command(child, PTRACE_SETOPTIONS, 0,
+                       PTRACE_O_TRACESYSGOOD|PTRACE_O_TRACEFORK) < 0)
+        goto detach;
+
+    return 0;
 
  detach:
-    ptrace(PTRACE_DETACH, pid, 0, 0);
-    return err;
+    /* Don't clobber child->error */
+    ptrace(PTRACE_DETACH, child->pid, 0, 0);
+    return -1;
 }
 
 int ptrace_detach_child(struct ptrace_child *child) {
-    int err;
-    err = ptrace(PTRACE_DETACH, child->pid, 0, 0);
-    if (!err)
-        child->state = ptrace_detached;
-    return err;
+    if (ptrace_command(child, PTRACE_DETACH, 0, 0) < 0)
+        return -1;
+    child->state = ptrace_detached;
+    return 0;
 }
 
 int ptrace_wait(struct ptrace_child *child) {
-    int err;
-    if ((err = waitpid(child->pid, &child->status, 0)) < 0)
-        return err;
+    if (waitpid(child->pid, &child->status, 0) < 0) {
+        child->error = errno;
+        return -1;
+    }
     if (WIFEXITED(child->status) || WIFSIGNALED(child->status)) {
         child->state = ptrace_exited;
     } else if(WIFSTOPPED(child->status)) {
@@ -71,14 +78,16 @@ int ptrace_wait(struct ptrace_child *child) {
                 ptrace_after_syscall : ptrace_at_syscall;
         } else {
             if (sig == SIGTRAP && (((child->status >> 8) & PTRACE_EVENT_FORK) == PTRACE_EVENT_FORK))
-                ptrace(PTRACE_GETEVENTMSG, child->pid, 0, &child->forked_pid);
+                ptrace_command(child, PTRACE_GETEVENTMSG, 0, &child->forked_pid);
             if (child->state != ptrace_at_syscall)
                 child->state = ptrace_stopped;
-            if (sig != SIGSTOP && sig != SIGTRAP && sig != SIGCHLD)
+            if (sig != SIGSTOP && sig != SIGTRAP && sig != SIGCHLD) {
+                child->error = EAGAIN;
                 return -1;
+            }
         }
     } else {
-        errno = EINVAL;
+        child->error = EINVAL;
         return -1;
     }
     return 0;
@@ -91,21 +100,23 @@ int ptrace_advance_to_state(struct ptrace_child *child,
         switch(desired) {
         case ptrace_at_syscall:
         case ptrace_after_syscall:
-            err = ptrace(PTRACE_SYSCALL, child->pid, 0, 0);
+            err = ptrace_command(child, PTRACE_SYSCALL, 0, 0);
             break;
         case ptrace_running:
-            return ptrace(PTRACE_CONT, child->pid, 0, 0);
+            return ptrace_command(child, PTRACE_CONT, 0, 0);
         case ptrace_stopped:
             err = kill(child->pid, SIGSTOP);
+            if (err < 0)
+                child->error = errno;
             break;
         default:
-            errno = EINVAL;
+            child->error = EINVAL;
             return -1;
         }
         if (err < 0)
             return err;
-        if((err = ptrace_wait(child)) < 0)
-            return err;
+        if(ptrace_wait(child) < 0)
+            return -1;
     }
     return 0;
 }
@@ -117,18 +128,16 @@ static void reset_user_struct(struct user *user) {
 }
 
 int ptrace_save_regs(struct ptrace_child *child) {
-    int err;
-    err = ptrace_advance_to_state(child, ptrace_at_syscall);
-    if (err)
-        return err;
-    err = ptrace(PTRACE_GETREGS, child->pid, 0, &child->user);
-    if (!err)
-        reset_user_struct(&child->user);
-    return err;
+    if (ptrace_advance_to_state(child, ptrace_at_syscall) < 0)
+        return -1;
+    if (ptrace_command(child, PTRACE_GETREGS, 0, &child->user) < 0)
+        return -1;
+    reset_user_struct(&child->user);
+    return 0;
 }
 
 int ptrace_restore_regs(struct ptrace_child *child) {
-    return ptrace(PTRACE_SETREGS, child->pid, 0, &child->user);
+    return ptrace_command(child, PTRACE_SETREGS, 0, &child->user);
 }
 
 unsigned long ptrace_remote_syscall(struct ptrace_child *child,
@@ -137,15 +146,14 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
                                     unsigned long p2, unsigned long p3,
                                     unsigned long p4, unsigned long p5) {
     unsigned long rv;
-    assert(!ptrace_advance_to_state(child, ptrace_at_syscall));
+    if (ptrace_advance_to_state(child, ptrace_at_syscall) < 0)
+        return -1;
 
 #define setreg(r, v) do {                                               \
-        if (ptrace(PTRACE_POKEUSER, child->pid,                         \
-                   offsetof(struct user, regs.r),                       \
-                   (v)) < 0) {                                          \
-            perror(#r);                                                 \
-            exit(1);                                                    \
-        }                                                               \
+        if (ptrace_command(child, PTRACE_POKEUSER,                      \
+                           offsetof(struct user, regs.r),               \
+                           (v)) < 0)                                    \
+            return -1;                                                  \
     } while(0)
 
     setreg(orig_ax, sysno);
@@ -156,9 +164,12 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
     setreg(syscall_arg4, p4);
     setreg(syscall_arg5, p5);
 
-    assert(!ptrace_advance_to_state(child, ptrace_after_syscall));
+    if (ptrace_advance_to_state(child, ptrace_after_syscall) < 0)
+        return -1;
 
-    rv = ptrace(PTRACE_PEEKUSER, child->pid, offsetof(struct user, regs.reg_ax));
+    rv = ptrace_command(child, PTRACE_PEEKUSER, offsetof(struct user, regs.reg_ax));
+    if (child->error)
+        return -1;
 
     setreg(reg_ax, child->user.regs.orig_ax);
     setreg(reg_ip, child->user.regs.reg_ip);
@@ -169,25 +180,23 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
 }
 
 int ptrace_memcpy_to_child(struct ptrace_child *child, child_addr_t dst, const void *src, size_t n) {
-    int err;
     unsigned long scratch;
 
     while (n >= sizeof(unsigned long)) {
-        if ((err = ptrace(PTRACE_POKEDATA, child->pid, dst, *((unsigned long*)src))) < 0)
-            return err;
+        if (ptrace_command(child, PTRACE_POKEDATA, dst, *((unsigned long*)src)) < 0)
+            return -1;
         dst += sizeof(unsigned long);
         src += sizeof(unsigned long);
         n -= sizeof(unsigned long);
     }
 
     if (n) {
-        errno = 0;
-        scratch = ptrace(PTRACE_PEEKDATA, child->pid, dst);
-        if (errno)
+        scratch = ptrace_command(child, PTRACE_PEEKDATA, dst);
+        if (child->error)
             return -1;
         memcpy(&scratch, src, n);
-        if ((err = ptrace(PTRACE_POKEDATA, child->pid, dst, scratch)) < 0)
-            return err;
+        if (ptrace_command(child, PTRACE_POKEDATA, dst, scratch) < 0)
+            return -1;
     }
 
     return 0;
@@ -197,9 +206,8 @@ int ptrace_memcpy_from_child(struct ptrace_child *child, void *dst, child_addr_t
     unsigned long scratch;
 
     while (n) {
-        errno = 0;
-        scratch = ptrace(PTRACE_PEEKDATA, child->pid, src);
-        if (errno) return -1;
+         scratch = ptrace_command(child, PTRACE_PEEKDATA, src);
+        if (child->error) return -1;
         memcpy(dst, &scratch, min(n, sizeof(unsigned long)));
 
         dst += sizeof(unsigned long);
@@ -210,6 +218,15 @@ int ptrace_memcpy_from_child(struct ptrace_child *child, void *dst, child_addr_t
             n = 0;
     }
     return 0;
+}
+
+static long __ptrace_command(struct ptrace_child *child, enum __ptrace_request req,
+                             void *addr, void *data) {
+    long rv;
+    errno = 0;
+    rv = ptrace(req, child->pid, addr, data);
+    child->error = errno;
+    return rv;
 }
 
 

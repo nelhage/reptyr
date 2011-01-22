@@ -26,6 +26,7 @@ struct ptrace_child {
     struct user user;
     enum child_state state;
     int status;
+    int error;
     unsigned long forked_pid;
 };
 
