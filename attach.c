@@ -68,7 +68,7 @@ int *get_child_tty_fds(struct ptrace_child *child, int *count) {
     return fds;
 }
 
-void move_process_group(struct ptrace_child *from, pid_t to) {
+void move_process_group(struct ptrace_child *child, pid_t from, pid_t to) {
     DIR *dir;
     struct dirent *d;
     pid_t pid;
@@ -82,9 +82,9 @@ void move_process_group(struct ptrace_child *from, pid_t to) {
         if(d->d_name[0] == '.') continue;
         pid = strtol(d->d_name, &p, 10);
         if (*p) continue;
-        if (getpgid(pid) == from->pid) {
+        if (getpgid(pid) == from) {
             debug("Change pgid for pid %d", pid);
-            err = ptrace_remote_syscall(from, __NR_setpgid,
+            err = ptrace_remote_syscall(child, __NR_setpgid,
                                         pid, to,
                                         0, 0, 0, 0);
             if (err < 0)
@@ -187,12 +187,13 @@ int attach_child(pid_t pid, const char *pty) {
         goto out_kill;
     }
 
-    move_process_group(&child, dummy.pid);
+    move_process_group(&child, child.pid, dummy.pid);
 
     err = ptrace_remote_syscall(&child, __NR_setsid,
                                 0, 0, 0, 0, 0, 0);
     if (err < 0) {
         error("Failed to setsid: %s", strerror(-err));
+        move_process_group(&child, dummy.pid, child.pid);
         goto out_kill;
     }
 
@@ -237,6 +238,7 @@ int attach_child(pid_t pid, const char *pty) {
 
  out_kill:
     kill(dummy.pid, SIGKILL);
+    ptrace_detach_child(&dummy);
     ptrace_wait(&dummy);
     ptrace_remote_syscall(&child, __NR_waitid,
                           P_PID, dummy.pid, 0, WNOHANG,
