@@ -130,6 +130,7 @@ void check_yama_ptrace_scope(void) {
         char buf[256];
         int n;
         n = read(fd, buf, sizeof buf);
+        close(fd);
         if (n > 0) {
             if (!atoi(buf)) {
                 return;
