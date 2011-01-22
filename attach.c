@@ -145,7 +145,7 @@ int do_setsid(struct ptrace_child *child) {
     return err;
 }
 
-int ignore_hup(struct ptrace_child *child) {
+int ignore_hup(struct ptrace_child *child, unsigned long scratch_page) {
     int err;
 #ifdef __NR_signal
     err = ptrace_remote_syscall(child, __NR_signal,
@@ -233,7 +233,7 @@ int attach_child(pid_t pid, const char *pty) {
 
     debug("Copied terminal settings");
 
-    err = ignore_hup(&child);
+    err = ignore_hup(&child, scratch_page);
     if (err < 0)
         goto out_close;
 
