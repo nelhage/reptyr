@@ -14,6 +14,23 @@
 
 #include "ptrace.h"
 
+/*
+ * RHEL 5's kernel supports these flags, but their libc doesn't ship a ptrace.h
+ * that defines them. Define them here, and if our kernel doesn't support them,
+ * we'll find out when PTRACE_SETOPTIONS fails.
+ */
+#ifndef PTRACE_O_TRACESYSGOOD
+#define PTRACE_O_TRACESYSGOOD 0x00000001
+#endif
+
+#ifndef PTRACE_O_TRACEFORK
+#define PTRACE_O_TRACEFORK 0x00000002
+#endif
+
+#ifndef PTRACE_EVENT_FORK
+#define PTRACE_EVENT_FORK 1
+#endif
+
 #define min(x, y) ({				\
 	typeof(x) _min1 = (x);			\
 	typeof(y) _min2 = (y);			\
