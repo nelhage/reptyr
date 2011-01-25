@@ -231,8 +231,10 @@ int attach_child(pid_t pid, const char *pty) {
     kill(pid, SIGTSTP);
     wait_for_stop(pid);
 
-    if (ptrace_attach_child(&child, pid))
+    if (ptrace_attach_child(&child, pid)) {
+        kill(pid, SIGCONT);
         return child.error;
+    }
 
     if (ptrace_advance_to_state(&child, ptrace_at_syscall)) {
         err = child.error;
