@@ -141,9 +141,9 @@ int do_setsid(struct ptrace_child *child) {
     kill(dummy.pid, SIGKILL);
     ptrace_detach_child(&dummy);
     ptrace_wait(&dummy);
-    ptrace_remote_syscall(child, __NR_waitid,
-                          P_PID, dummy.pid, 0, WNOHANG,
-                          0, 0);
+    ptrace_remote_syscall(child, __NR_wait4,
+                          dummy.pid, 0, WNOHANG,
+                          0, 0, 0);
     return err;
 }
 
