@@ -5,3 +5,9 @@
 - Attaching to a process with children doesn't work right.
   This should be possible to fix -- I just need to ptrace each child
   individually and do the same games to it.
+
+- After attaching to a curses application, the arrow keys may not work
+  right. This is because of terminal state that is configured by
+  sending control characters to the terminal emulator, instead of
+  through termios, and so I can't easily restore. Suspending and
+  resuming the app will often usually perform the appropriate reset.
