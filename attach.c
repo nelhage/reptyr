@@ -168,6 +168,16 @@ int ignore_hup(struct ptrace_child *child, unsigned long scratch_page) {
     return err;
 }
 
+/*
+ * Wait for the specific pid to enter state 'T', or stopped. We have to pull the
+ * /proc file rather than attaching with ptrace() and doing a wait() because
+ * half the point of this exercise is for the process's real parent (the shell)
+ * to see the TSTP.
+ *
+ * In case the process is masking or ignoring SIGTSTP, we time out after a
+ * second and continue with the attach -- it'll still work mostly right, you
+ * just won't get the old shell back.
+ */
 void wait_for_stop(pid_t pid) {
     struct timeval start, now;
     struct timespec sleep;
@@ -186,24 +196,29 @@ void wait_for_stop(pid_t pid) {
         if ((now.tv_sec > start.tv_sec && now.tv_usec > start.tv_usec)
             || (now.tv_sec - start.tv_sec > 1)) {
             error("Timed out waiting for child stop.");
-            return;
+            break;
         }
+        /*
+         * If anything goes wrong reading or parsing the stat node, just give
+         * up.
+         */
         lseek(fd, 0, SEEK_SET);
         if (read(fd, buf, sizeof buf) <= 0)
-            return;
+            break;
         p = strchr(buf, ' ');
         if (!p)
-            return;
+            break;
         p = strchr(p+1, ' ');
         if (!p)
-            return;
+            break;
         if (*(p+1) == 'T')
-            return;
+            break;
 
         sleep.tv_sec  = 0;
         sleep.tv_nsec = 10000000;
         nanosleep(&sleep, NULL);
     }
+    close(fd);
 }
 
 int attach_child(pid_t pid, const char *pty) {
