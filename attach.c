@@ -221,12 +221,40 @@ void wait_for_stop(pid_t pid) {
     close(fd);
 }
 
+int copy_tty_state(pid_t pid, const char *pty) {
+    char buf[PATH_MAX];
+    int fd, err = 0;
+    struct termios tio;
+
+    snprintf(buf, sizeof buf, "/proc/%d/fd/0", pid);
+    if ((fd = open(buf, O_RDONLY)) < 0)
+        return -errno;
+
+    if (tcgetattr(fd, &tio) < 0) {
+        err = errno;
+        goto out;
+    }
+    close(fd);
+
+    if ((fd = open(pty, O_RDONLY)) < 0)
+        return -errno;
+
+    if (tcsetattr(fd, TCSANOW, &tio) < 0)
+        err = errno;
+out:
+    close(fd);
+    return -err;
+}
+
 int attach_child(pid_t pid, const char *pty) {
     struct ptrace_child child;
     unsigned long scratch_page = -1;
     int *child_tty_fds = NULL, n_fds, child_fd;
     int i;
     int err = 0;
+
+    if ((err = copy_tty_state(pid, pty)) < 0)
+        return -err;
 
     kill(pid, SIGTSTP);
     wait_for_stop(pid);
@@ -278,21 +306,6 @@ int attach_child(pid_t pid, const char *pty) {
     }
 
     debug("Opened the new tty in the child: %d", child_fd);
-
-    err = ptrace_remote_syscall(&child, __NR_ioctl,
-                                child_tty_fds[0], TCGETS, scratch_page,
-                                0, 0, 0);
-    debug("TCGETS(%d): %d", child_tty_fds[0], err);
-    if(err < 0)
-        goto out_close;
-    err = ptrace_remote_syscall(&child, __NR_ioctl,
-                                child_fd, TCSETS, scratch_page,
-                                0, 0, 0);
-    debug("TCSETS: %d", err);
-    if (err < 0)
-        goto out_close;
-
-    debug("Copied terminal settings");
 
     err = ignore_hup(&child, scratch_page);
     if (err < 0)
