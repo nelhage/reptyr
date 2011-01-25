@@ -97,10 +97,6 @@ int ptrace_wait(struct ptrace_child *child) {
                 ptrace_command(child, PTRACE_GETEVENTMSG, 0, &child->forked_pid);
             if (child->state != ptrace_at_syscall)
                 child->state = ptrace_stopped;
-            if (sig != SIGSTOP && sig != SIGTRAP && sig != SIGCHLD && sig != SIGHUP && sig != SIGCONT) {
-                child->error = EAGAIN;
-                return -1;
-            }
         }
     } else {
         child->error = EINVAL;
@@ -114,8 +110,12 @@ int ptrace_advance_to_state(struct ptrace_child *child,
     int err;
     while(child->state != desired) {
         switch(desired) {
-        case ptrace_at_syscall:
         case ptrace_after_syscall:
+        case ptrace_at_syscall:
+            if (WIFSTOPPED(child->status) && WSTOPSIG(child->status) == SIGSEGV) {
+                child->error = EAGAIN;
+                return -1;
+            }
             err = ptrace_command(child, PTRACE_SYSCALL, 0, 0);
             break;
         case ptrace_running:
