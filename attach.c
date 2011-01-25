@@ -355,8 +355,10 @@ int attach_child(pid_t pid, const char *pty) {
  out_detach:
     ptrace_detach_child(&child);
 
-    if (err == 0)
+    if (err == 0) {
+        kill(child.pid, SIGCONT);
         kill(child.pid, SIGWINCH);
+    }
 
     return err < 0 ? -err : err;
 }
