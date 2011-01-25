@@ -12,6 +12,8 @@
 #include <sys/wait.h>
 #include <signal.h>
 #include <limits.h>
+#include <time.h>
+#include <sys/time.h>
 
 #include "ptrace.h"
 #include "reptyr.h"
@@ -166,6 +168,44 @@ int ignore_hup(struct ptrace_child *child, unsigned long scratch_page) {
     return err;
 }
 
+void wait_for_stop(pid_t pid) {
+    struct timeval start, now;
+    struct timespec sleep;
+    char stat_path[PATH_MAX], buf[256], *p;
+    int fd;
+    
+    snprintf(stat_path, sizeof stat_path, "/proc/%d/stat", pid);
+    fd = open(stat_path, O_RDONLY);
+    if (!fd) {
+        error("Unable to open %s: %s", stat_path, strerror(errno));
+        return;
+    }
+    gettimeofday(&start, NULL);
+    while (1) {
+        gettimeofday(&now, NULL);
+        if ((now.tv_sec > start.tv_sec && now.tv_usec > start.tv_usec)
+            || (now.tv_sec - start.tv_sec > 1)) {
+            error("Timed out waiting for child stop.");
+            return;
+        }
+        lseek(fd, 0, SEEK_SET);
+        if (read(fd, buf, sizeof buf) <= 0)
+            return;
+        p = strchr(buf, ' ');
+        if (!p)
+            return;
+        p = strchr(p+1, ' ');
+        if (!p)
+            return;
+        if (*(p+1) == 'T')
+            return;
+
+        sleep.tv_sec  = 0;
+        sleep.tv_nsec = 10000000;
+        nanosleep(&sleep, NULL);
+    }
+}
+
 int attach_child(pid_t pid, const char *pty) {
     struct ptrace_child child;
     unsigned long scratch_page = -1;
@@ -173,6 +213,8 @@ int attach_child(pid_t pid, const char *pty) {
     int i;
     int err = 0;
 
+    kill(pid, SIGTSTP);
+    wait_for_stop(pid);
 
     if (ptrace_attach_child(&child, pid))
         return child.error;
