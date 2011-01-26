@@ -9,4 +9,3 @@
 #define syscall_arg4 edi
 #define syscall_arg5 ebp
 
-#define mmap_syscall __NR_mmap2
