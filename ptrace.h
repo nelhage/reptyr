@@ -2,18 +2,6 @@
 #include <sys/user.h>
 #include <unistd.h>
 
-#if defined(__amd64__)
-#include "arch/amd64.h"
-#elif defined(__i386__)
-#include "arch/i386.h"
-#else
-#error Unsupported architecture.
-#endif
-
-#ifndef mmap_syscall
-#define mmap_syscall __NR_mmap
-#endif
-
 enum child_state {
     ptrace_detached = 0,
     ptrace_at_syscall,
@@ -25,11 +13,12 @@ enum child_state {
 
 struct ptrace_child {
     pid_t pid;
-    struct user user;
     enum child_state state;
     int status;
     int error;
     unsigned long forked_pid;
+    struct user user;
+    unsigned long saved_syscall;
 };
 
 typedef unsigned long child_addr_t;

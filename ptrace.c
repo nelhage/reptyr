@@ -36,14 +36,19 @@
 	typeof(y) _min2 = (y);			\
 	_min1 < _min2 ? _min1 : _min2; })
 
-
 static long __ptrace_command(struct ptrace_child *child, enum __ptrace_request req,
                              void *, void*);
 
 #define ptrace_command(cld, req, ...) _ptrace_command(cld, req, ## __VA_ARGS__, NULL, NULL)
 #define _ptrace_command(cld, req, addr, data, ...) __ptrace_command((cld), (req), (void*)(addr), (void*)(data))
 
-int ptrace_wait(struct ptrace_child *child);
+#if defined(__amd64__)
+#include "arch/amd64.h"
+#elif defined(__i386__)
+#include "arch/i386.h"
+#else
+#error Unsupported architecture.
+#endif
 
 int ptrace_attach_child(struct ptrace_child *child, pid_t pid) {
     memset(child, 0, sizeof child);
@@ -139,8 +144,7 @@ int ptrace_advance_to_state(struct ptrace_child *child,
 
 
 static void reset_user_struct(struct user *user) {
-    arch_fixup_ip(user);
-    user->regs.reg_ax = user->regs.orig_ax;
+    arch_fixup_regs(user);
 }
 
 int ptrace_save_regs(struct ptrace_child *child) {
@@ -149,11 +153,17 @@ int ptrace_save_regs(struct ptrace_child *child) {
     if (ptrace_command(child, PTRACE_GETREGS, 0, &child->user) < 0)
         return -1;
     reset_user_struct(&child->user);
+    if (arch_save_syscall(child) < 0)
+        return -1;
     return 0;
 }
 
 int ptrace_restore_regs(struct ptrace_child *child) {
-    return ptrace_command(child, PTRACE_SETREGS, 0, &child->user);
+    int err;
+    err = ptrace_command(child, PTRACE_SETREGS, 0, &child->user);
+    if (err < 0)
+        return err;
+    return arch_restore_syscall(child);
 }
 
 unsigned long ptrace_remote_syscall(struct ptrace_child *child,
@@ -172,7 +182,8 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
             return -1;                                                  \
     } while(0)
 
-    setreg(orig_ax, sysno);
+    if (arch_set_syscall(child, sysno) < 0)
+        return -1;
     setreg(syscall_arg0, p0);
     setreg(syscall_arg1, p1);
     setreg(syscall_arg2, p2);
