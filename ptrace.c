@@ -139,7 +139,7 @@ int ptrace_advance_to_state(struct ptrace_child *child,
 
 
 static void reset_user_struct(struct user *user) {
-    user->regs.reg_ip -= 2;
+    arch_fixup_ip(user);
     user->regs.reg_ax = user->regs.orig_ax;
 }
 
@@ -183,11 +183,11 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
     if (ptrace_advance_to_state(child, ptrace_after_syscall) < 0)
         return -1;
 
-    rv = ptrace_command(child, PTRACE_PEEKUSER, offsetof(struct user, regs.reg_ax));
+    rv = ptrace_command(child, PTRACE_PEEKUSER,
+                        offsetof(struct user, regs.syscall_rv));
     if (child->error)
         return -1;
 
-    setreg(reg_ax, child->user.regs.orig_ax);
     setreg(reg_ip, child->user.regs.reg_ip);
 
     #undef setreg

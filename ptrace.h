@@ -2,10 +2,12 @@
 #include <sys/user.h>
 #include <unistd.h>
 
-#ifdef __amd64__
+#if defined(__amd64__)
 #include "arch/amd64.h"
-#else
+#elif defined(__i386__)
 #include "arch/i386.h"
+#else
+#error Unsupported architecture.
 #endif
 
 #ifndef mmap_syscall
