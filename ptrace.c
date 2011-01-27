@@ -1,4 +1,5 @@
 #include <sys/ptrace.h>
+#include <asm/ptrace.h>
 #include <sys/types.h>
 #include <sys/user.h>
 #include <sys/wait.h>
@@ -46,6 +47,8 @@ static long __ptrace_command(struct ptrace_child *child, enum __ptrace_request r
 #include "arch/amd64.h"
 #elif defined(__i386__)
 #include "arch/i386.h"
+#elif defined(__arm__)
+#include "arch/arm.h"
 #else
 #error Unsupported architecture.
 #endif
