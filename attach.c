@@ -16,10 +16,10 @@
 #include "ptrace.h"
 #include "reptyr.h"
 
-static void do_unmap(struct ptrace_child *child, child_addr_t addr, int pages) {
+static void do_unmap(struct ptrace_child *child, child_addr_t addr, unsigned long len) {
     if (addr == (unsigned long)-1)
         return;
-    ptrace_remote_syscall(child, __NR_munmap, addr, pages, 0, 0, 0, 0);
+    ptrace_remote_syscall(child, __NR_munmap, addr, len, 0, 0, 0, 0);
 }
 
 int *get_child_tty_fds(struct ptrace_child *child, int *count) {
@@ -172,6 +172,7 @@ int attach_child(pid_t pid, const char *pty) {
     int *child_tty_fds = NULL, n_fds, child_fd;
     int i;
     int err = 0;
+    long page_size = sysconf(_SC_PAGE_SIZE);
 
 
     if (ptrace_attach_child(&child, pid))
@@ -187,7 +188,7 @@ int attach_child(pid_t pid, const char *pty) {
     }
 
     scratch_page = ptrace_remote_syscall(&child, mmap_syscall, 0,
-                                         PAGE_SIZE, PROT_READ|PROT_WRITE,
+                                         page_size, PROT_READ|PROT_WRITE,
                                          MAP_ANONYMOUS|MAP_PRIVATE, 0, 0);
 
     if (scratch_page > (unsigned long)-1000) {
@@ -277,7 +278,7 @@ int attach_child(pid_t pid, const char *pty) {
     free(child_tty_fds);
 
  out_unmap:
-    do_unmap(&child, scratch_page, 1);
+    do_unmap(&child, scratch_page, page_size);
 
     ptrace_restore_regs(&child);
  out_detach:
