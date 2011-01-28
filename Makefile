@@ -15,5 +15,5 @@ clean:
 	rm -f reptyr $(OBJS)
 
 install: reptyr
-	install -d -m 766 $(DESTDIR)$(PREFIX)/bin/
-	install -m 766 reptyr $(DESTDIR)$(PREFIX)/bin/reptyr
+	install -d -m 755 $(DESTDIR)$(PREFIX)/bin/
+	install -m 755 reptyr $(DESTDIR)$(PREFIX)/bin/reptyr
