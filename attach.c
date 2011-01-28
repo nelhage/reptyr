@@ -236,6 +236,12 @@ int copy_tty_state(pid_t pid, const char *pty) {
     if ((fd = open(buf, O_RDONLY)) < 0)
         return -errno;
 
+    if (!isatty(fd)) {
+        err = ENOTTY;
+        error("Target is not connected to a terminal.");
+        goto out;
+    }
+    
     if (tcgetattr(fd, &tio) < 0) {
         err = errno;
         goto out;
