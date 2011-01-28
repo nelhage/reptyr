@@ -369,9 +369,11 @@ int attach_child(pid_t pid, const char *pty) {
     ptrace_detach_child(&child);
 
     if (err == 0) {
-        kill(child.pid, SIGCONT);
-        kill(child.pid, SIGWINCH);
+        kill(child.pid, SIGSTOP);
+        wait_for_stop(child.pid);
     }
+    kill(child.pid, SIGCONT);
+    kill(child.pid, SIGWINCH);
 
     return err < 0 ? -err : err;
 }

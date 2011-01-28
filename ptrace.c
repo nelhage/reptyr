@@ -66,6 +66,7 @@ int ptrace_finish_attach(struct ptrace_child *child, pid_t pid) {
     memset(child, 0, sizeof child);
     child->pid = pid;
 
+    kill(pid, SIGCONT);
     if (ptrace_wait(child) < 0)
         goto detach;
 
