@@ -21,18 +21,6 @@ background it, you will still have to run "bg" or "fg" in the old
 terminal. This is likely impossible to fix in a reasonable way without
 patching your shell.)
 
-After attaching, you may need to send a ^L or similar to ncurses
-applications to force them to redraw themselves. With "less", after
-attaching, a ^Z will cause it to both redraw and to set up the
-terminal application keys so that you can scroll with arrow keys
-again.
-
-After attaching, your old terminal will probably be left in a strange
-state, since it will be waiting for the process to quit, but not
-getting any output. You can either background your process and do 'bg;
-disown', or just close the window -- reptyr should protect your
-process from being killed when you do so.
-
 "But wait, isn't this just screenify?"
 --------------------------------------
 
