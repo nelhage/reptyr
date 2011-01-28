@@ -16,10 +16,10 @@
 #include "ptrace.h"
 #include "reptyr.h"
 
-#ifdef __NR_mmap
-#define mmap_syscall __NR_mmap
-#else
+#ifdef __NR_mmap2
 #define mmap_syscall __NR_mmap2
+#else
+#define mmap_syscall __NR_mmap
 #endif
 
 static void do_unmap(struct ptrace_child *child, child_addr_t addr, unsigned long len) {
