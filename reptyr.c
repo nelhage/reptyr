@@ -160,6 +160,11 @@ int main(int argc, char **argv) {
         case 'l':
             do_attach = 0;
             break;
+        case 'v':
+            printf("This is reptyr version %s.\n", REPTYR_VERSION);
+            printf(" by Nelson Elhage <nelhage@nelhage.com>\n");
+            printf("http://github.com/nelhage/reptyr/\n");
+            return 0;
         default:
             usage(argv[0]);
             return 1;
