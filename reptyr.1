@@ -1,0 +1,131 @@
+.mso www.tmac
+.TH reptyr 1 "03 Feb 2011"
+.SH NAME
+reptyr \- Reparent a running program to a new terminal
+.SH SYNOPSIS
+.B reptyr
+.I PID
+
+.B reptyr \-l
+
+.SH DESCRIPTION
+
+.B reptyr
+is a utility for taking an existing running program and
+attaching it to a new terminal. Started a long-running process over
+ssh, but have to leave and don't want to interrupt it? Just start a
+screen, use
+.B reptyr
+to grab it, and then kill the ssh session and head
+on home.
+.LP
+.B reptyr
+works by attaching to the target program using
+.BR ptrace (2),
+
+redirecting relevant file descriptors, and changing the program's controlling
+terminal (See
+.BR tty (4))
+It is this last detail that makes
+.B reptyr
+work much better than alternatives such as
+.BR retty (1).
+
+.LP
+After attaching a program, the program will appear to be either backgrounded or
+suspended to the shell it was launched from (depending on the shell). For
+maximal safety you can run
+.IP
+bg; disown
+.LP
+
+in the old shell to remove the association with the program, but
+.B reptyr
+will attempt to ensure that the target program remains running even if you close
+the shell without doing so.
+
+.SH OPTIONS
+
+.B \-l
+.IP
+Instead of attaching to a new process, create a new pty pair, proxy the master
+end to the current terminal, and then print the name of the slave pty. This can
+be passed to e.g.
+.B gdb\'s
+.I set inferior-tty
+option.
+.LP
+
+.B \-v
+.IP
+Print the version of
+.B reptyr
+and exit.
+.LP
+
+.B \-h
+.IP
+Print a usage message and exit.
+.LP
+
+.SH NOTES
+
+.B reptyr
+depends on the
+.BR ptrace (2)
+system call to attach to the remote program. On Ubuntu Maverick and higher, this
+ability is disabled by default for security reasons. You can enable it
+temporarily by doing
+.IP
+ # echo 0 > /proc/sys/kernel/yama/ptrace_scope
+.LP
+as root, or permanently by editing the file
+.IR /etc/sysctl.d/10-ptrace.conf ,
+which also contains more information about this setting.
+
+.SH BUGS
+
+When attaching to some curses programs, they will not redraw the screen right
+away, and a
+.B ^L
+or similar will be needed to force a redraw.
+
+Similarly, after attaching to certain programs, the old terminal will be left in
+an odd state, and a
+.B clear
+or even
+.B reset
+may be required before the old terminal is usable again.
+
+Attaching to rtorrent (and probably some other apps) doesn't work right
+(rtorrent stops accepting input) (The problem is that rtorrent is using epoll to
+poll stdin, and we don't update the internal reference that the epoll fd has to
+the old tty).
+
+Attaching to a process with children doesn't work right. This should be possible
+to fix -- I just need to ptrace each child individually and do the same games to
+it.
+
+Attaching a
+.BR less (1)
+process doesn't work if you have a
+.I .lessfilter
+file, as
+.BR less
+leaves around a zombie child in this case. This could be worked around.
+
+Bugs should be reported to the author (see below) or via the issue tracker on
+GitHub.
+
+.SH AUTHORS
+
+reptyr was written by Nelson Elhage <nelhage@nelhage.com>.
+
+.SH HOMEPAGE
+
+.URL https://github.com/nelhage/reptyr
+
+.SH SEE ALSO
+
+.BR neercs (1),
+.BR screen (1)

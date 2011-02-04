@@ -1,7 +1,0 @@
-- Attaching to rtorrent doesn't work right (rtorrent stops accepting input)
-  (The problem is that rtorrent is using epoll to poll stdin, and we don't
-   update the internal reference that the epoll fd has to the old tty).
-
-- Attaching to a process with children doesn't work right.
-  This should be possible to fix -- I just need to ptrace each child
-  individually and do the same games to it.
