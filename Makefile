@@ -17,3 +17,5 @@ clean:
 install: reptyr
 	install -d -m 755 $(DESTDIR)$(PREFIX)/bin/
 	install -m 755 reptyr $(DESTDIR)$(PREFIX)/bin/reptyr
+	install -d -m 755 $(DESTDIR)$(PREFIX)/share/man/man1
+	install -m 644 reptyr.1 $(DESTDIR)$(PREFIX)/share/man/man1/reptyr.1
