@@ -74,9 +74,7 @@ void setup_raw(struct termios *save) {
     if (tcgetattr(0, save) < 0)
         die("Unable to read terminal attributes: %m");
     set = *save;
-    set.c_iflag = 0;
-    set.c_oflag = 0;
-    set.c_lflag = 0;
+    cfmakeraw(&set);
     if (tcsetattr(0, TCSANOW, &set) < 0)
         die("Unable to set terminal attributes: %m");
 }
