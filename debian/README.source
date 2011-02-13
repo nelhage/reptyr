@@ -1,0 +1,26 @@
+reptyr for Debian
+-----------------
+
+The Debian packaging for reptyr is maintained in the debian branch of
+the upstream reptyr git repository, at git://github.com/nelhage/reptyr.
+
+I use pristine-tar to ensure that we can consistently generate the
+same orig tarball for a given Debian release of reptyr. When creating
+a new Debian release, use
+
+    pristine-tar commit PATH_TO_TARBALL COMMIT-ISH
+
+to associate a particular tarball with a particular commit on the
+master branch.
+
+When using a git snapshot for a Debian release, use the
+github-generated download of the revision being snapshotted as the
+orig tarball. This tarball can be fetched from the URL:
+
+    https://github.com/nelhage/reptyr/tarball/COMMIT
+
+and should be renamed to match the expected form of an upstream
+tarball name (i.e. reptyr_VERSION.orig.tar.gz) before importing it
+into pristine-tar.
+
+ -- Evan Broder <evan@ebroder.net>, Sat, 12 Feb 2011 16:42:42 -0800

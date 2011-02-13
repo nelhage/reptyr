@@ -1,0 +1,5 @@
+reptyr (0.1+git.20110212t183758.d51bfc2d-1) unstable; urgency=low
+
+  * Initial release (Closes: #613123)
+
+ -- Evan Broder <evan@ebroder.net>  Sat, 12 Feb 2011 15:06:56 -0800
