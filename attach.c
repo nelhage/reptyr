@@ -259,10 +259,9 @@ int copy_tty_state(pid_t pid, const char *pty) {
 
     if (!isatty(fd)) {
         err = ENOTTY;
-        error("Target is not connected to a terminal.");
         goto out;
     }
-    
+
     if (tcgetattr(fd, &tio) < 0) {
         err = errno;
         goto out;
@@ -279,7 +278,7 @@ out:
     return -err;
 }
 
-int attach_child(pid_t pid, const char *pty) {
+int attach_child(pid_t pid, const char *pty, int force_stdio) {
     struct ptrace_child child;
     unsigned long scratch_page = -1;
     int *child_tty_fds = NULL, n_fds, child_fd;
@@ -287,8 +286,13 @@ int attach_child(pid_t pid, const char *pty) {
     int err = 0;
     long page_size = sysconf(_SC_PAGE_SIZE);
 
-    if ((err = copy_tty_state(pid, pty)) < 0)
-        return -err;
+    if ((err = copy_tty_state(pid, pty)) < 0) {
+        if (err == -ENOTTY && !force_stdio) {
+            error("Target is not connected to a terminal.\n"
+                  "    Use -s to force attaching anyways.");
+            return -err;
+        }
+    }
 
     kill(pid, SIGTSTP);
     wait_for_stop(pid);
@@ -318,10 +322,22 @@ int attach_child(pid_t pid, const char *pty) {
 
     debug("Allocated scratch page: %lx", scratch_page);
 
-    child_tty_fds = get_child_tty_fds(&child, &n_fds);
-    if (!child_tty_fds) {
-        err = child.error;
-        goto out_unmap;
+    if (force_stdio) {
+        child_tty_fds = malloc(3 * sizeof(int));
+        if (!child_tty_fds) {
+            err = ENOMEM;
+            goto out_unmap;
+        }
+        n_fds = 3;
+        child_tty_fds[0] = 0;
+        child_tty_fds[1] = 1;
+        child_tty_fds[2] = 2;
+    } else {
+        child_tty_fds = get_child_tty_fds(&child, &n_fds);
+        if (!child_tty_fds) {
+            err = child.error;
+            goto out_unmap;
+        }
     }
 
     if (ptrace_memcpy_to_child(&child, scratch_page, pty, strlen(pty)+1)) {
