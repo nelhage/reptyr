@@ -59,6 +59,7 @@ int *get_child_tty_fds(struct ptrace_child *child, int *count) {
     DIR *dir;
     ssize_t len;
     struct dirent *d;
+    int *tmp = NULL;
 
     debug("Looking up fds for tty in child.");
     snprintf(buf, sizeof buf, "/proc/%d/fd/0", child->pid);
@@ -83,9 +84,15 @@ int *get_child_tty_fds(struct ptrace_child *child, int *count) {
             || strcmp(buf, "/dev/tty") == 0) {
             if (n == allocated) {
                 allocated = allocated ? 2 * allocated : 2;
-                fds = realloc(fds, sizeof(int) * allocated);
-                if (!fds)
-                    goto out;
+                tmp = realloc(fds, allocated * sizeof *tmp);
+                if (tmp == NULL) {
+                  child->error = errno;
+                  error("Unable to allocate memory for fd array.");
+                  free(fds);
+                  fds = NULL;
+                  goto out;
+                }
+                fds = tmp;
             }
             debug("Found an alias for the tty: %s", d->d_name);
             fds[n++] = atoi(d->d_name);
