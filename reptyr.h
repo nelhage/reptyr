@@ -20,7 +20,7 @@
  * THE SOFTWARE.
  */
 
-#define REPTYR_VERSION "0.1"
+#define REPTYR_VERSION "0.2"
 
 int attach_child(pid_t pid, const char *pty, int force_stdio);
 void die(const char *msg, ...);
