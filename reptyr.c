@@ -139,7 +139,10 @@ void do_proxy(int pty) {
 }
 
 void usage(char *me) {
-    fprintf(stderr, "Usage: %s [-l | PID]\n", me);
+    fprintf(stderr, "Usage: %s [-s] PID\n", me);
+    fprintf(stderr, "       %s -l\n", me);
+    fprintf(stderr, "  -l    Create a new pty pair and print the name of the slave.\n");
+    fprintf(stderr, "  -s    Attach fds 0-2 on the target, even if it is not attached to a tty.\n");
 }
 
 void check_yama_ptrace_scope(void) {
@@ -165,19 +168,25 @@ int main(int argc, char **argv) {
     struct termios saved_termios;
     struct sigaction act;
     int pty;
+    int arg = 1;
     int do_attach = 1;
+    int force_stdio = 0;
 
     if (argc < 2) {
         usage(argv[0]);
         return 2;
     }
-    if(argv[1][0] == '-') {
-        switch(argv[1][1]) {
+    if(argv[arg][0] == '-') {
+        switch(argv[arg][1]) {
         case 'h':
             usage(argv[0]);
             return 0;
         case 'l':
             do_attach = 0;
+            break;
+        case 's':
+            arg++;
+            force_stdio = 1;
             break;
         case 'v':
             printf("This is reptyr version %s.\n", REPTYR_VERSION);
@@ -198,9 +207,9 @@ int main(int argc, char **argv) {
         die("Unable to unlockpt: %m");
 
     if (do_attach) {
-        pid_t child = atoi(argv[1]);
+        pid_t child = atoi(argv[arg]);
         int err;
-        if ((err = attach_child(child, ptsname(pty)))) {
+        if ((err = attach_child(child, ptsname(pty), force_stdio))) {
             fprintf(stderr, "Unable to attach to pid %d: %s\n", child, strerror(err));
             if (err == EPERM) {
                 check_yama_ptrace_scope();
