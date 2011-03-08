@@ -199,6 +199,12 @@ int main(int argc, char **argv) {
         }
     }
 
+    if (do_attach && arg >= argc) {
+        fprintf(stderr, "%s: No pid specified to attach\n", argv[0]);
+        usage(argv[0]);
+        return 1;
+    }
+
     if ((pty = open("/dev/ptmx", O_RDWR|O_NOCTTY)) < 0)
         die("Unable to open /dev/ptmx: %m");
     if (unlockpt(pty) < 0)
