@@ -157,7 +157,7 @@ void check_yama_ptrace_scope(void) {
                 return;
             }
         }
-    } else if(errno == ENOENT)
+    } else if (errno == ENOENT)
         return;
     fprintf(stderr, "The kernel denied permission while attaching. If your uid matches\n");
     fprintf(stderr, "the target's, check the value of /proc/sys/kernel/yama/ptrace_scope.\n");
@@ -176,7 +176,7 @@ int main(int argc, char **argv) {
         usage(argv[0]);
         return 2;
     }
-    if(argv[arg][0] == '-') {
+    if (argv[arg][0] == '-') {
         switch(argv[arg][1]) {
         case 'h':
             usage(argv[0]);

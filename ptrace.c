@@ -117,7 +117,7 @@ int ptrace_wait(struct ptrace_child *child) {
     }
     if (WIFEXITED(child->status) || WIFSIGNALED(child->status)) {
         child->state = ptrace_exited;
-    } else if(WIFSTOPPED(child->status)) {
+    } else if (WIFSTOPPED(child->status)) {
         int sig = WSTOPSIG(child->status);
         if (sig & 0x80) {
             child->state = (child->state == ptrace_at_syscall) ?
@@ -138,7 +138,7 @@ int ptrace_wait(struct ptrace_child *child) {
 int ptrace_advance_to_state(struct ptrace_child *child,
                             enum child_state desired) {
     int err;
-    while(child->state != desired) {
+    while (child->state != desired) {
         switch(desired) {
         case ptrace_after_syscall:
         case ptrace_at_syscall:
@@ -161,7 +161,7 @@ int ptrace_advance_to_state(struct ptrace_child *child,
         }
         if (err < 0)
             return err;
-        if(ptrace_wait(child) < 0)
+        if (ptrace_wait(child) < 0)
             return -1;
     }
     return 0;
@@ -205,7 +205,7 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
                            offsetof(struct user, regs.r),               \
                            (v)) < 0)                                    \
             return -1;                                                  \
-    } while(0)
+    } while (0)
 
     if (arch_set_syscall(child, sysno) < 0)
         return -1;

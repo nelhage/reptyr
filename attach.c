@@ -107,7 +107,7 @@ int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
     while ((d = readdir(dir)) != NULL) {
         if (d->d_name[0] == '.') continue;
         snprintf(buf, sizeof buf, "/proc/%d/fd/%s", child->pid, d->d_name);
-        if(stat(buf, &st) < 0)
+        if (stat(buf, &st) < 0)
             continue;
 
         if (st.st_rdev == child_status.ctty
@@ -145,7 +145,7 @@ void move_process_group(struct ptrace_child *child, pid_t from, pid_t to) {
         return;
 
     while ((d = readdir(dir)) != NULL) {
-        if(d->d_name[0] == '.') continue;
+        if (d->d_name[0] == '.') continue;
         pid = strtol(d->d_name, &p, 10);
         if (*p) continue;
         if (getpgid(pid) == from) {
