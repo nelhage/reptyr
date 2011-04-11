@@ -210,7 +210,7 @@ int main(int argc, char **argv) {
     if (unlockpt(pty) < 0)
         die("Unable to unlockpt: %m");
     if (grantpt(pty) < 0)
-        die("Unable to unlockpt: %m");
+        die("Unable to grantpt: %m");
 
     if (do_attach) {
         pid_t child = atoi(argv[arg]);
