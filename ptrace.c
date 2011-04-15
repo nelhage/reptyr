@@ -75,7 +75,7 @@ static long __ptrace_command(struct ptrace_child *child, enum __ptrace_request r
 #endif
 
 int ptrace_attach_child(struct ptrace_child *child, pid_t pid) {
-    memset(child, 0, sizeof child);
+    memset(child, 0, sizeof *child);
     child->pid = pid;
     if (ptrace_command(child, PTRACE_ATTACH) < 0)
         return -1;
@@ -84,7 +84,7 @@ int ptrace_attach_child(struct ptrace_child *child, pid_t pid) {
 }
 
 int ptrace_finish_attach(struct ptrace_child *child, pid_t pid) {
-    memset(child, 0, sizeof child);
+    memset(child, 0, sizeof *child);
     child->pid = pid;
 
     kill(pid, SIGCONT);
