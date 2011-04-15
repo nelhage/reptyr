@@ -21,7 +21,9 @@
  */
 #include "x86_common.h"
 
-static struct ptrace_personality arch_personality[1] = {
+#define ARCH_HAVE_MULTIPLE_PERSONALITIES
+
+static struct ptrace_personality arch_personality[2] = {
     {
         offsetof(struct user, regs.rax),
         offsetof(struct user, regs.rdi),
@@ -32,11 +34,64 @@ static struct ptrace_personality arch_personality[1] = {
         offsetof(struct user, regs.r9),
         offsetof(struct user, regs.rip),
     },
+    {
+        offsetof(struct user, regs.rax),
+        offsetof(struct user, regs.rbx),
+        offsetof(struct user, regs.rcx),
+        offsetof(struct user, regs.rdx),
+        offsetof(struct user, regs.rsi),
+        offsetof(struct user, regs.rdi),
+        offsetof(struct user, regs.rbp),
+        offsetof(struct user, regs.rip),
+    },
 };
 
-struct x86_personality x86_personality[1] = {
+struct x86_personality x86_personality[2] = {
+    {
+        offsetof(struct user, regs.orig_rax),
+        offsetof(struct user, regs.rax),
+    },
     {
         offsetof(struct user, regs.orig_rax),
         offsetof(struct user, regs.rax),
     },
 };
+
+struct syscall_numbers arch_syscall_numbers[2] = {
+#include "default-syscalls.h"
+    {
+        /*
+         * These don't seem to be available in any convenient header. We could
+         * include unistd_32.h, but those definitions would conflict with the
+         * standard ones. So, let's just hardcode the values for now. Probably
+         * we should generate this from unistd_32.h during the build process or
+         * soemthing.
+         */
+        .nr_mmap    = 90,
+        .nr_mmap2   = 192,
+        .nr_munmap  = 91,
+        .nr_getsid  = 147,
+        .nr_setsid  = 66,
+        .nr_setpgid = 57,
+        .nr_fork    = 2,
+        .nr_wait4   = 114,
+        .nr_signal  = 48,
+        .nr_rt_sigaction = 173,
+        .nr_open    = 5,
+        .nr_close   = 6,
+        .nr_ioctl   = 54,
+        .nr_dup2    = 63
+    }
+};
+
+int arch_get_personality(struct ptrace_child *child) {
+    unsigned long cs;
+
+    cs = ptrace_command(child, PTRACE_PEEKUSER,
+                        offsetof(struct user, regs.cs));
+    if (child->error)
+        return -1;
+    if (cs == 0x23)
+        child->personality = 1;
+    return 0;
+}
