@@ -58,18 +58,20 @@ struct proc_stat {
 int parse_proc_stat(int statfd, struct proc_stat *out) {
     char buf[1024];
     int n;
+    unsigned dev;
     lseek(statfd, 0, SEEK_SET);
     if (read(statfd, buf, sizeof buf) < 0)
         return errno;
     n = sscanf(buf, "%d (%16[^)]) %c %d %d %d %u",
                &out->pid, out->comm,
                &out->state, &out->ppid, &out->sid,
-               &out->pgid, (unsigned*)&out->ctty);
+               &out->pgid, &dev);
     if (n == EOF)
         return errno;
     if (n != 7) {
         return EINVAL;
     }
+    out->ctty = dev;
     return 0;
 }
 
