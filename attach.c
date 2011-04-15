@@ -93,7 +93,7 @@ int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
     if ((child->error = parse_proc_stat(statfd, &child_status)))
         return NULL;
 
-    debug("Resolved child tty: %u", child_status.ctty);
+    debug("Resolved child tty: %x", (unsigned)child_status.ctty);
 
     if (stat("/dev/tty", &tty_st) < 0) {
         child->error = errno;
@@ -169,7 +169,7 @@ int do_setsid(struct ptrace_child *child) {
     if (err < 0)
         return err;
 
-    debug("Forked a child: %d", child->forked_pid);
+    debug("Forked a child: %ld", child->forked_pid);
 
     err = ptrace_finish_attach(&dummy, child->forked_pid);
     if (err < 0)
