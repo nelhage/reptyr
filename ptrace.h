@@ -35,6 +35,7 @@ enum child_state {
 struct ptrace_child {
     pid_t pid;
     enum child_state state;
+    int personality;
     int status;
     int error;
     unsigned long forked_pid;

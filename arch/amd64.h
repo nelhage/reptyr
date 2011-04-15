@@ -19,16 +19,24 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#define orig_ax orig_rax
-#define reg_ax  rax
-#define reg_ip  rip
-
-#define syscall_rv   rax
-#define syscall_arg0 rdi
-#define syscall_arg1 rsi
-#define syscall_arg2 rdx
-#define syscall_arg3 r10
-#define syscall_arg4 r8
-#define syscall_arg5 r9
-
 #include "x86_common.h"
+
+static struct ptrace_personality arch_personality[1] = {
+    {
+        offsetof(struct user, regs.rax),
+        offsetof(struct user, regs.rdi),
+        offsetof(struct user, regs.rsi),
+        offsetof(struct user, regs.rdx),
+        offsetof(struct user, regs.r10),
+        offsetof(struct user, regs.r8),
+        offsetof(struct user, regs.r9),
+        offsetof(struct user, regs.rip),
+    },
+};
+
+struct x86_personality x86_personality[1] = {
+    {
+        offsetof(struct user, regs.orig_rax),
+        offsetof(struct user, regs.rax),
+    },
+};

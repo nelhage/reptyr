@@ -19,18 +19,21 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#define reg_ip ARM_pc
+static struct ptrace_personality arch_personality[1] = {
+    {
+        offsetof(struct user, regs.uregs[0]),
+        offsetof(struct user, regs.uregs[0]),
+        offsetof(struct user, regs.uregs[1]),
+        offsetof(struct user, regs.uregs[2]),
+        offsetof(struct user, regs.uregs[3]),
+        offsetof(struct user, regs.uregs[4]),
+        offsetof(struct user, regs.uregs[5]),
+        offsetof(struct user, regs.ARM_pc),
+    }
+};
 
-#define syscall_rv   uregs[0]
-#define syscall_arg0 uregs[0]
-#define syscall_arg1 uregs[1]
-#define syscall_arg2 uregs[2]
-#define syscall_arg3 uregs[3]
-#define syscall_arg4 uregs[4]
-#define syscall_arg5 uregs[5]
-
-static inline void arch_fixup_regs(struct user *user) {
-    user->regs.reg_ip -= 4;
+static inline void arch_fixup_regs(struct ptrace_child *child) {
+    child->user.regs.ARM_pc -= 4;
 }
 
 static inline int arch_set_syscall(struct ptrace_child *child,
@@ -40,7 +43,7 @@ static inline int arch_set_syscall(struct ptrace_child *child,
 
 static inline int arch_save_syscall(struct ptrace_child *child) {
     unsigned long swi;
-    swi = ptrace_command(child, PTRACE_PEEKTEXT, child->user.regs.reg_ip);
+    swi = ptrace_command(child, PTRACE_PEEKTEXT, child->user.regs.ARM_pc);
     if (child->error)
         return -1;
     if (swi == 0xef000000)
