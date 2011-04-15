@@ -43,6 +43,23 @@ struct ptrace_child {
     unsigned long saved_syscall;
 };
 
+struct syscall_numbers {
+    long nr_mmap;
+    long nr_mmap2;
+    long nr_munmap;
+    long nr_getsid;
+    long nr_setsid;
+    long nr_setpgid;
+    long nr_fork;
+    long nr_wait4;
+    long nr_signal;
+    long nr_rt_sigaction;
+    long nr_open;
+    long nr_close;
+    long nr_ioctl;
+    long nr_dup2;
+};
+
 typedef unsigned long child_addr_t;
 
 int ptrace_wait(struct ptrace_child *child);
@@ -62,3 +79,4 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
 
 int ptrace_memcpy_to_child(struct ptrace_child *, child_addr_t, const void*, size_t);
 int ptrace_memcpy_from_child(struct ptrace_child *, void*, child_addr_t, size_t);
+struct syscall_numbers *ptrace_syscall_numbers(struct ptrace_child *child);

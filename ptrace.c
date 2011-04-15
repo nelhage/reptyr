@@ -76,7 +76,7 @@ struct ptrace_personality {
     size_t reg_ip;
 };
 
-struct ptrace_personality *personality(struct ptrace_child *child);
+static struct ptrace_personality *personality(struct ptrace_child *child);
 
 #if defined(__amd64__)
 #include "arch/amd64.h"
@@ -88,8 +88,22 @@ struct ptrace_personality *personality(struct ptrace_child *child);
 #error Unsupported architecture.
 #endif
 
-struct ptrace_personality *personality(struct ptrace_child *child) {
+#ifndef ARCH_HAVE_MULTIPLE_PERSONALITIES
+int arch_get_personality(struct ptrace_child *child) {
+    return 0;
+}
+
+struct syscall_numbers arch_syscall_numbers[] = {
+#include "arch/default-syscalls.h"
+};
+#endif
+
+static struct ptrace_personality *personality(struct ptrace_child *child) {
     return &arch_personality[child->personality];
+}
+
+struct syscall_numbers *ptrace_syscall_numbers(struct ptrace_child *child) {
+    return &arch_syscall_numbers[child->personality];
 }
 
 int ptrace_attach_child(struct ptrace_child *child, pid_t pid) {
@@ -107,6 +121,9 @@ int ptrace_finish_attach(struct ptrace_child *child, pid_t pid) {
 
     kill(pid, SIGCONT);
     if (ptrace_wait(child) < 0)
+        goto detach;
+
+    if (arch_get_personality(child))
         goto detach;
 
     if (ptrace_command(child, PTRACE_SETOPTIONS, 0,
