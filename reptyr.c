@@ -143,6 +143,8 @@ void usage(char *me) {
     fprintf(stderr, "       %s -l\n", me);
     fprintf(stderr, "  -l    Create a new pty pair and print the name of the slave.\n");
     fprintf(stderr, "  -s    Attach fds 0-2 on the target, even if it is not attached to a tty.\n");
+    fprintf(stderr, "  -h    Print this help message and exit.\n");
+    fprintf(stderr, "  -v    Print the version number and exit.\n");
 }
 
 void check_yama_ptrace_scope(void) {
