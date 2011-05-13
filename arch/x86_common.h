@@ -19,23 +19,41 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-static inline void arch_fixup_regs(struct user *user) {
-    user->regs.reg_ip -= 2;
-    user->regs.reg_ax = user->regs.orig_ax;
+
+struct x86_personality {
+    size_t orig_ax;
+    size_t ax;
+};
+
+struct x86_personality x86_personality[];
+
+static inline struct x86_personality *x86_pers(struct ptrace_child *child) {
+    return &x86_personality[child->personality];
+}
+
+static inline void arch_fixup_regs(struct ptrace_child *child) {
+    struct x86_personality *x86pers = x86_pers(child);
+    struct ptrace_personality *pers = personality(child);
+    struct user *user = &child->user;
+#define ptr(user, off) ((unsigned long*)((void*)(user)+(off)))
+    *ptr(user, pers->reg_ip) -= 2;
+    *ptr(user, x86pers->ax) = *ptr(user, x86pers->orig_ax);
 }
 
 static inline int arch_set_syscall(struct ptrace_child *child,
                                    unsigned long sysno) {
     return ptrace_command(child, PTRACE_POKEUSER,
-                          offsetof(struct user, regs.orig_ax),
+                          x86_pers(child)->orig_ax,
                           sysno);
 }
 
 static inline int arch_save_syscall(struct ptrace_child *child) {
-    child->saved_syscall = child->user.regs.orig_ax;
+    child->saved_syscall = *ptr(&child->user, x86_pers(child)->orig_ax);
     return 0;
 }
 
 static inline int arch_restore_syscall(struct ptrace_child *child) {
     return 0;
 }
+
+#undef ptr
