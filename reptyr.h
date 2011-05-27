@@ -20,7 +20,7 @@
  * THE SOFTWARE.
  */
 
-#define REPTYR_VERSION "0.2dev"
+#define REPTYR_VERSION "0.3"
 
 int attach_child(pid_t pid, const char *pty, int force_stdio);
 #define __printf __attribute__((format(printf, 1, 2)))

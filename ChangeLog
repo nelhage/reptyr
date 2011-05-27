@@ -1,3 +1,7 @@
+* 0.3 (May 27, 2011)
+ - Add support for attaching 32-bit programs on x86_64.
+ - Fix a bug on ARM.
+
 * 0.2 (Mar 1, 2011)
  - Add a man page
  - Add a 'make install' target
