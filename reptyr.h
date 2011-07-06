@@ -20,9 +20,10 @@
  * THE SOFTWARE.
  */
 
-#define REPTYR_VERSION "0.1"
+#define REPTYR_VERSION "0.3"
 
-int attach_child(pid_t pid, const char *pty);
-void die(const char *msg, ...);
-void debug(const char *msg, ...);
-void error(const char *msg, ...);
+int attach_child(pid_t pid, const char *pty, int force_stdio);
+#define __printf __attribute__((format(printf, 1, 2)))
+void __printf die(const char *msg, ...);
+void __printf debug(const char *msg, ...);
+void __printf error(const char *msg, ...);

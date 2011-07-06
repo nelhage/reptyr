@@ -38,6 +38,19 @@ reptyr fixes all of these problems, and is the only such tool I know
 of that does so. See below for some more details on how it
 accomplishes this.
 
+PORTABILITY
+-----------
+
+reptyr is Linux-only. It uses ptrace to attach to the target and control it at
+the syscall level, so it is highly dependent on Linux's particular syscall API,
+syscalls, and terminal ioctl()s. A port to Solaris or BSD may be technically
+feasible, but would probably require significant re-architecting to abstract out
+the platform-specific bits.
+
+reptyr works on i386, x86_64, and ARM. Ports to other architectures should be
+straightforward, and should in most cases be as simple as adding an arch/ARCH.h
+file and adding a clause to the ifdef ladder in ptrace.c.
+
 ptrace_scope on Ubuntu Maverick and up
 --------------------------------------
 

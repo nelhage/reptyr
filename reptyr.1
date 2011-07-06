@@ -56,6 +56,17 @@ be passed to e.g.
 option.
 .LP
 
+.B \-s
+.IP
+
+By default, reptyr will move any file descriptors in the target that were
+connected to the target's controlling terminal to point to the new terminal. The
+.B -s
+option will cause reptyr to unconditionally attach file descriptors 0, 1, and 2
+in the target, even if the target has no controlling terminal or they are not
+connected to a terminal.
+.LP
+
 .B \-v
 .IP
 Print the version of

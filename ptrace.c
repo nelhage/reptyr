@@ -64,6 +64,20 @@ static long __ptrace_command(struct ptrace_child *child, enum __ptrace_request r
 #define ptrace_command(cld, req, ...) _ptrace_command(cld, req, ## __VA_ARGS__, NULL, NULL)
 #define _ptrace_command(cld, req, addr, data, ...) __ptrace_command((cld), (req), (void*)(addr), (void*)(data))
 
+
+struct ptrace_personality {
+    size_t syscall_rv;
+    size_t syscall_arg0;
+    size_t syscall_arg1;
+    size_t syscall_arg2;
+    size_t syscall_arg3;
+    size_t syscall_arg4;
+    size_t syscall_arg5;
+    size_t reg_ip;
+};
+
+static struct ptrace_personality *personality(struct ptrace_child *child);
+
 #if defined(__amd64__)
 #include "arch/amd64.h"
 #elif defined(__i386__)
@@ -74,8 +88,26 @@ static long __ptrace_command(struct ptrace_child *child, enum __ptrace_request r
 #error Unsupported architecture.
 #endif
 
+#ifndef ARCH_HAVE_MULTIPLE_PERSONALITIES
+int arch_get_personality(struct ptrace_child *child) {
+    return 0;
+}
+
+struct syscall_numbers arch_syscall_numbers[] = {
+#include "arch/default-syscalls.h"
+};
+#endif
+
+static struct ptrace_personality *personality(struct ptrace_child *child) {
+    return &arch_personality[child->personality];
+}
+
+struct syscall_numbers *ptrace_syscall_numbers(struct ptrace_child *child) {
+    return &arch_syscall_numbers[child->personality];
+}
+
 int ptrace_attach_child(struct ptrace_child *child, pid_t pid) {
-    memset(child, 0, sizeof child);
+    memset(child, 0, sizeof *child);
     child->pid = pid;
     if (ptrace_command(child, PTRACE_ATTACH) < 0)
         return -1;
@@ -84,11 +116,14 @@ int ptrace_attach_child(struct ptrace_child *child, pid_t pid) {
 }
 
 int ptrace_finish_attach(struct ptrace_child *child, pid_t pid) {
-    memset(child, 0, sizeof child);
+    memset(child, 0, sizeof *child);
     child->pid = pid;
 
     kill(pid, SIGCONT);
     if (ptrace_wait(child) < 0)
+        goto detach;
+
+    if (arch_get_personality(child))
         goto detach;
 
     if (ptrace_command(child, PTRACE_SETOPTIONS, 0,
@@ -117,7 +152,7 @@ int ptrace_wait(struct ptrace_child *child) {
     }
     if (WIFEXITED(child->status) || WIFSIGNALED(child->status)) {
         child->state = ptrace_exited;
-    } else if(WIFSTOPPED(child->status)) {
+    } else if (WIFSTOPPED(child->status)) {
         int sig = WSTOPSIG(child->status);
         if (sig & 0x80) {
             child->state = (child->state == ptrace_at_syscall) ?
@@ -138,7 +173,7 @@ int ptrace_wait(struct ptrace_child *child) {
 int ptrace_advance_to_state(struct ptrace_child *child,
                             enum child_state desired) {
     int err;
-    while(child->state != desired) {
+    while (child->state != desired) {
         switch(desired) {
         case ptrace_after_syscall:
         case ptrace_at_syscall:
@@ -161,23 +196,19 @@ int ptrace_advance_to_state(struct ptrace_child *child,
         }
         if (err < 0)
             return err;
-        if(ptrace_wait(child) < 0)
+        if (ptrace_wait(child) < 0)
             return -1;
     }
     return 0;
 }
 
 
-static void reset_user_struct(struct user *user) {
-    arch_fixup_regs(user);
-}
-
 int ptrace_save_regs(struct ptrace_child *child) {
     if (ptrace_advance_to_state(child, ptrace_at_syscall) < 0)
         return -1;
     if (ptrace_command(child, PTRACE_GETREGS, 0, &child->user) < 0)
         return -1;
-    reset_user_struct(&child->user);
+    arch_fixup_regs(child);
     if (arch_save_syscall(child) < 0)
         return -1;
     return 0;
@@ -202,10 +233,10 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
 
 #define setreg(r, v) do {                                               \
         if (ptrace_command(child, PTRACE_POKEUSER,                      \
-                           offsetof(struct user, regs.r),               \
+                           personality(child)->r,                       \
                            (v)) < 0)                                    \
             return -1;                                                  \
-    } while(0)
+    } while (0)
 
     if (arch_set_syscall(child, sysno) < 0)
         return -1;
@@ -220,11 +251,12 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
         return -1;
 
     rv = ptrace_command(child, PTRACE_PEEKUSER,
-                        offsetof(struct user, regs.syscall_rv));
+                        personality(child)->syscall_rv);
     if (child->error)
         return -1;
 
-    setreg(reg_ip, child->user.regs.reg_ip);
+    setreg(reg_ip, *(unsigned long*)((void*)&child->user +
+                                     personality(child)->reg_ip));
 
     #undef setreg
 
