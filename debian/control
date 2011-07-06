@@ -11,7 +11,7 @@ Vcs-Browser: http://github.com/nelhage/reptyr/tree/debian
 Package: reptyr
 Architecture: i386 amd64 armel
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: A tool for moving running programs between ptys
+Description: Tool for moving running programs between ptys
  reptyr is a utility for taking an existing running program and
  attaching it to a new terminal, and is particularly useful for moving
  a long-running process into a GNU screen session.
