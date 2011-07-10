@@ -5,7 +5,7 @@ Maintainer: Evan Broder <evan@ebroder.net>
 Build-Depends: debhelper (>= 7.0.50~)
 Standards-Version: 3.9.1
 Homepage: https://github.com/nelhage/reptyr
-Vcs-Git: git://github.com/nelhage/reptyr.git debian
+Vcs-Git: git://github.com/nelhage/reptyr.git
 Vcs-Browser: http://github.com/nelhage/reptyr/tree/debian
 
 Package: reptyr
