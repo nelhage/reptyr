@@ -1,8 +1,9 @@
 reptyr (0.3-2) UNRELEASED; urgency=low
 
   * Bump standards version to 3.9.2 (no changes).
+  * Build for armhf (Closes: #633750)
 
- -- Evan Broder <evan@ebroder.net>  Tue, 12 Jul 2011 11:54:57 -0700
+ -- Evan Broder <evan@ebroder.net>  Wed, 13 Jul 2011 09:08:15 -0700
 
 reptyr (0.3-1) unstable; urgency=low
 
