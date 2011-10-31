@@ -2,6 +2,7 @@ reptyr (0.3-2) UNRELEASED; urgency=low
 
   * Bump standards version to 3.9.2 (no changes).
   * Build for armhf (Closes: #633750)
+  * Enable support for buildflags
 
  -- Evan Broder <evan@ebroder.net>  Wed, 13 Jul 2011 09:08:15 -0700
 

@@ -3,5 +3,8 @@
 %:
 	dh $@
 
+override_dh_auto_build:
+	dh_auto_build -- $(shell dpkg-buildflags --export=configure)
+
 override_dh_auto_install:
 	dh_auto_install -- PREFIX=/usr
