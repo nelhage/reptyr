@@ -152,6 +152,7 @@ void usage(char *me) {
     fprintf(stderr, "  -s    Attach fds 0-2 on the target, even if it is not attached to a tty.\n");
     fprintf(stderr, "  -h    Print this help message and exit.\n");
     fprintf(stderr, "  -v    Print the version number and exit.\n");
+    fprintf(stderr, "  -V    Print verbose debug output.\n");
 }
 
 void check_yama_ptrace_scope(void) {
