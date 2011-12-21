@@ -38,6 +38,8 @@
 #error reptyr is currently Linux-only.
 #endif
 
+static int verbose = 0;
+
 void _debug(const char *pfx, const char *msg, va_list ap) {
 
     if (pfx)
@@ -56,10 +58,13 @@ void die(const char *msg, ...) {
 }
 
 void debug(const char *msg, ...) {
+
     va_list ap;
-    va_start(ap, msg);
-    _debug("[+] ", msg, ap);
-    va_end(ap);
+    if (verbose) {
+        va_start(ap, msg);
+        _debug("[+] ", msg, ap);
+        va_end(ap);
+    }
 }
 
 void error(const char *msg, ...) {
@@ -195,6 +200,10 @@ int main(int argc, char **argv) {
             printf(" by Nelson Elhage <nelhage@nelhage.com>\n");
             printf("http://github.com/nelhage/reptyr/\n");
             return 0;
+        case 'V':
+            arg++;
+            verbose = 1;
+            break;
         default:
             usage(argv[0]);
             return 1;
