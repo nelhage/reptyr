@@ -37,7 +37,7 @@ make install PREFIX=/usr DESTDIR=%{buildroot}
 
 
 %files
-%defattr(-,root,root-)
+%defattr(-,root,root,-)
 %{_bindir}/%{name}
 %{_mandir}/man1/*
 %doc COPYING NOTES README ChangeLog
