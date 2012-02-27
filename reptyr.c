@@ -97,8 +97,11 @@ int writeall(int fd, const void *buf, ssize_t count) {
     ssize_t rv;
     while (count > 0) {
         rv = write(fd, buf, count);
-        if (rv < 0)
+        if (rv < 0) {
+            if (errno == EINTR)
+                continue;
             return rv;
+        }
         count -= rv;
         buf += rv;
     }
