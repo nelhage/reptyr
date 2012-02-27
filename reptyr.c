@@ -97,15 +97,18 @@ int writeall(int fd, const void *buf, ssize_t count) {
     ssize_t rv;
     while (count > 0) {
         rv = write(fd, buf, count);
-        if (rv < 0)
+        if (rv < 0) {
+            if (errno == EINTR)
+                continue;
             return rv;
+        }
         count -= rv;
         buf += rv;
     }
     return 0;
 }
 
-int winch_happened = 0;
+volatile int winch_happened = 0;
 
 void do_winch(int signal) {
     winch_happened = 1;
@@ -117,9 +120,8 @@ void do_proxy(int pty) {
     fd_set set;
     while (1) {
         if (winch_happened) {
-            resize_pty(pty);
-            /* FIXME: racy against a second resize */
             winch_happened = 0;
+            resize_pty(pty);
         }
         FD_ZERO(&set);
         FD_SET(0, &set);
@@ -241,11 +243,11 @@ int main(int argc, char **argv) {
     }
 
     setup_raw(&saved_termios);
-    resize_pty(pty);
     memset(&act, 0, sizeof act);
     act.sa_handler = do_winch;
     act.sa_flags   = 0;
     sigaction(SIGWINCH, &act, NULL);
+    resize_pty(pty);
     do_proxy(pty);
     tcsetattr(0, TCSANOW, &saved_termios);
 
