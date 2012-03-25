@@ -1,5 +1,5 @@
 reptyr - A tool for "re-ptying" programs.
------------------------------------------
+=========================================
 
 reptyr is a utility for taking an existing running program and
 attaching it to a new terminal. Started a long-running process over
@@ -10,7 +10,7 @@ on home.
 USAGE
 -----
 
-  reptyr PID
+    reptyr PID
 
 "reptyr PID" will grab the process with id PID and attach it to your
 current terminal.
@@ -58,7 +58,7 @@ ptrace_scope on Ubuntu Maverick and up
 Ubuntu Maverick and higher, this ability is disabled by default for security
 reasons. You can enable it temporarily by doing
 
- # echo 0 > /proc/sys/kernel/yama/ptrace_scope
+    # echo 0 > /proc/sys/kernel/yama/ptrace_scope
 
 as root, or permanently by editing the file /etc/sysctl.d/10-ptrace.conf, which
 also contains more information about exactly what this setting accomplishes.
@@ -97,4 +97,4 @@ with any questions or bug reports.
 
 URL
 ---
-http://github.com/nelhage/reptyr
+[http://github.com/nelhage/reptyr]()
