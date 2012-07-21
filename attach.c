@@ -263,11 +263,11 @@ void wait_for_stop(pid_t pid, int fd) {
 
 int copy_tty_state(pid_t pid, const char *pty) {
     char buf[PATH_MAX];
-    int fd, err = 0;
+    int fd, err = EINVAL;
     struct termios tio;
     int i;
 
-    for (i = 0; i < 3; i++) {
+    for (i = 0; i < 3 && err; i++) {
         err = 0;
         snprintf(buf, sizeof buf, "/proc/%d/fd/%d", pid, i);
 
