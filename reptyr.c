@@ -246,6 +246,19 @@ int main(int argc, char **argv) {
     } else {
         printf("Opened a new pty: %s\n", ptsname(pty));
         fflush(stdout);
+        if (argc > 2) {
+            if(!fork()) {
+                setenv("REPTYR_PTY", ptsname(pty), 1);
+                if (getenv("REPTYR_REDIRECT")) {
+                    int f;
+                    f = open(ptsname(pty), O_RDONLY, 0); dup2(f, 0);            close(f);
+                    f = open(ptsname(pty), O_WRONLY, 0); dup2(f, 1); dup2(f,2); close(f);
+                }
+                close(pty);
+                execvp(argv[2], argv+2);
+                exit(1);
+            }
+        }
     }
 
     setup_raw(&saved_termios);
