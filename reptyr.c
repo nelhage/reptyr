@@ -245,6 +245,7 @@ int main(int argc, char **argv) {
         }
     } else {
         printf("Opened a new pty: %s\n", ptsname(pty));
+        fflush(stdout);
     }
 
     setup_raw(&saved_termios);
