@@ -6,7 +6,7 @@ reptyr \- Reparent a running program to a new terminal
 .B reptyr
 .I PID
 
-.B reptyr \-l
+.B reptyr \-l|\-L [COMMAND [ARGS]]
 
 .SH DESCRIPTION
 
@@ -45,7 +45,7 @@ the shell without doing so.
 
 .SH OPTIONS
 
-.B \-l
+.B \-l, \-L [COMMAND [ARGS]]
 .IP
 Instead of attaching to a new process, create a new pty pair, proxy the master
 end to the current terminal, and then print the name of the slave pty. This can
@@ -53,6 +53,22 @@ be passed to e.g.
 .B gdb\'s
 .I set inferior-tty
 option.
+
+If an optional
+.B COMMAND
+and
+.B ARGS
+are passed in conjunction with
+.B -l,
+that command will be executed as a child of
+.B reptyr
+with the
+.B REPTYR_PTY
+environment variable set to the name of the slave pty. If
+.B -L
+is used instead of
+.B -l,
+then fds 0-2 of the child will also be redirected to point to the slave.
 .LP
 
 .B \-s
