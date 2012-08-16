@@ -68,7 +68,9 @@ environment variable set to the name of the slave pty. If
 .B -L
 is used instead of
 .B -l,
-then fds 0-2 of the child will also be redirected to point to the slave.
+then fds 0-2 of the child will also be redirected to point to the
+slave, and the child will be run in a fresh session with the slave as
+its controlling terminal.
 .LP
 
 .B \-s

@@ -259,6 +259,8 @@ int main(int argc, char **argv) {
                 setenv("REPTYR_PTY", ptsname(pty), 1);
                 if (unattached_script_redirection) {
                     int f;
+                    setpgid(0, getppid());
+                    setsid();
                     f = open(ptsname(pty), O_RDONLY, 0); dup2(f, 0);            close(f);
                     f = open(ptsname(pty), O_WRONLY, 0); dup2(f, 1); dup2(f,2); close(f);
                 }
