@@ -1,3 +1,8 @@
+* 0.4 (Aug 16, 2012)
+ - Add support for scripting with the -l flag.
+ - Add a French translation of the man page
+ - Add a -V flag
+
 * 0.3 (May 27, 2011)
  - Add support for attaching 32-bit programs on x86_64.
  - Fix a bug on ARM.
