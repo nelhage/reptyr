@@ -1,4 +1,4 @@
-reptyr (0.5-1) UNRELEASED; urgency=low
+reptyr (0.5-1) unstable; urgency=low
 
   * New release (Closes: #711020):
     - Drop debian/patches/accept-cmd-line-build-flags.patch which was
