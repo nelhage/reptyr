@@ -1,10 +1,12 @@
 reptyr (0.5-1) UNRELEASED; urgency=low
 
-  * New release (Closes: #711020)
+  * New release (Closes: #711020):
+    - Drop debian/patches/accept-cmd-line-build-flags.patch which was
+      accepted upstream
   * Update debian/README.source to be more clear about willingness to
     support NMUs
 
- -- Evan Broder <evan@ebroder.net>  Wed, 05 Jun 2013 16:11:19 -0700
+ -- Evan Broder <evan@ebroder.net>  Wed, 05 Jun 2013 16:14:36 -0700
 
 reptyr (0.3-2) unstable; urgency=low
 
