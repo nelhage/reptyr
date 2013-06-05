@@ -3,6 +3,7 @@ reptyr (0.5-1) UNRELEASED; urgency=low
   * New release (Closes: #711020):
     - Drop debian/patches/accept-cmd-line-build-flags.patch which was
       accepted upstream
+    - Update debian/reptyr.docs
   * Update debian/README.source to be more clear about willingness to
     support NMUs
   * Update to standards version 3.9.4:
