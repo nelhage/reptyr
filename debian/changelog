@@ -6,8 +6,9 @@ reptyr (0.5-1) UNRELEASED; urgency=low
   * Update debian/README.source to be more clear about willingness to
     support NMUs
   * Update debian/copyright to the release 1.0 copyright-format spec
+  * Update Vcs-Git to match new policy
 
- -- Evan Broder <evan@ebroder.net>  Wed, 05 Jun 2013 16:18:45 -0700
+ -- Evan Broder <evan@ebroder.net>  Wed, 05 Jun 2013 16:20:50 -0700
 
 reptyr (0.3-2) unstable; urgency=low
 
