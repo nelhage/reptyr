@@ -1,8 +1,10 @@
 reptyr (0.5-1) UNRELEASED; urgency=low
 
   * New release (Closes: #711020)
+  * Update debian/README.source to be more clear about willingness to
+    support NMUs
 
- -- Evan Broder <evan@ebroder.net>  Wed, 05 Jun 2013 16:10:29 -0700
+ -- Evan Broder <evan@ebroder.net>  Wed, 05 Jun 2013 16:11:19 -0700
 
 reptyr (0.3-2) unstable; urgency=low
 
