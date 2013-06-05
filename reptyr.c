@@ -38,6 +38,8 @@
 #error reptyr is currently Linux-only.
 #endif
 
+static int verbose = 0;
+
 void _debug(const char *pfx, const char *msg, va_list ap) {
 
     if (pfx)
@@ -56,7 +58,12 @@ void die(const char *msg, ...) {
 }
 
 void debug(const char *msg, ...) {
+
     va_list ap;
+
+    if (!verbose)
+        return;
+
     va_start(ap, msg);
     _debug("[+] ", msg, ap);
     va_end(ap);
@@ -90,15 +97,18 @@ int writeall(int fd, const void *buf, ssize_t count) {
     ssize_t rv;
     while (count > 0) {
         rv = write(fd, buf, count);
-        if (rv < 0)
+        if (rv < 0) {
+            if (errno == EINTR)
+                continue;
             return rv;
+        }
         count -= rv;
         buf += rv;
     }
     return 0;
 }
 
-int winch_happened = 0;
+volatile sig_atomic_t winch_happened = 0;
 
 void do_winch(int signal) {
     winch_happened = 1;
@@ -110,9 +120,13 @@ void do_proxy(int pty) {
     fd_set set;
     while (1) {
         if (winch_happened) {
-            resize_pty(pty);
-            /* FIXME: racy against a second resize */
             winch_happened = 0;
+            /*
+             * FIXME: If a signal comes in after this point but before
+             * select(), the resize will be delayed until we get more
+             * input. signalfd() is probably the cleanest solution.
+             */
+            resize_pty(pty);
         }
         FD_ZERO(&set);
         FD_SET(0, &set);
@@ -140,11 +154,15 @@ void do_proxy(int pty) {
 
 void usage(char *me) {
     fprintf(stderr, "Usage: %s [-s] PID\n", me);
-    fprintf(stderr, "       %s -l\n", me);
+    fprintf(stderr, "       %s -l|-L [COMMAND [ARGS]]\n", me);
     fprintf(stderr, "  -l    Create a new pty pair and print the name of the slave.\n");
+    fprintf(stderr, "           if there are command-line arguments after -l\n");
+    fprintf(stderr, "           they are executed with REPTYR_PTY set to path of pty.\n");
+    fprintf(stderr, "  -L    Like '-l', but also redirect the child's stdio to the slave.\n");
     fprintf(stderr, "  -s    Attach fds 0-2 on the target, even if it is not attached to a tty.\n");
     fprintf(stderr, "  -h    Print this help message and exit.\n");
     fprintf(stderr, "  -v    Print the version number and exit.\n");
+    fprintf(stderr, "  -V    Print verbose debug output.\n");
 }
 
 void check_yama_ptrace_scope(void) {
@@ -173,6 +191,7 @@ int main(int argc, char **argv) {
     int arg = 1;
     int do_attach = 1;
     int force_stdio = 0;
+    int unattached_script_redirection = 0;
 
     if (argc < 2) {
         usage(argv[0]);
@@ -186,6 +205,10 @@ int main(int argc, char **argv) {
         case 'l':
             do_attach = 0;
             break;
+        case 'L':
+            do_attach = 0;
+            unattached_script_redirection = 1;
+            break;
         case 's':
             arg++;
             force_stdio = 1;
@@ -195,6 +218,10 @@ int main(int argc, char **argv) {
             printf(" by Nelson Elhage <nelhage@nelhage.com>\n");
             printf("http://github.com/nelhage/reptyr/\n");
             return 0;
+        case 'V':
+            arg++;
+            verbose = 1;
+            break;
         default:
             usage(argv[0]);
             return 1;
@@ -226,14 +253,30 @@ int main(int argc, char **argv) {
         }
     } else {
         printf("Opened a new pty: %s\n", ptsname(pty));
+        fflush(stdout);
+        if (argc > 2) {
+            if(!fork()) {
+                setenv("REPTYR_PTY", ptsname(pty), 1);
+                if (unattached_script_redirection) {
+                    int f;
+                    setpgid(0, getppid());
+                    setsid();
+                    f = open(ptsname(pty), O_RDONLY, 0); dup2(f, 0);            close(f);
+                    f = open(ptsname(pty), O_WRONLY, 0); dup2(f, 1); dup2(f,2); close(f);
+                }
+                close(pty);
+                execvp(argv[2], argv+2);
+                exit(1);
+            }
+        }
     }
 
     setup_raw(&saved_termios);
-    resize_pty(pty);
     memset(&act, 0, sizeof act);
     act.sa_handler = do_winch;
     act.sa_flags   = 0;
     sigaction(SIGWINCH, &act, NULL);
+    resize_pty(pty);
     do_proxy(pty);
     tcsetattr(0, TCSANOW, &saved_termios);
 

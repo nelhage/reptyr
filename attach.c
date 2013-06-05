@@ -73,6 +73,23 @@ int parse_proc_stat(int statfd, struct proc_stat *out) {
     return 0;
 }
 
+int read_proc_stat(pid_t pid, struct proc_stat *out) {
+    char stat_path[PATH_MAX];
+    int statfd;
+    int err;
+
+    snprintf(stat_path, sizeof stat_path, "/proc/%d/stat", pid);
+    statfd = open(stat_path, O_RDONLY);
+    if (statfd < 0) {
+        error("Unable to open %s: %s", stat_path, strerror(errno));
+        return -statfd;
+    }
+
+    err = parse_proc_stat(statfd, out);
+    close(statfd);
+    return err;
+}
+
 static void do_unmap(struct ptrace_child *child, child_addr_t addr, unsigned long len) {
     if (addr == (unsigned long)-1)
         return;
@@ -263,11 +280,11 @@ void wait_for_stop(pid_t pid, int fd) {
 
 int copy_tty_state(pid_t pid, const char *pty) {
     char buf[PATH_MAX];
-    int fd, err = 0;
+    int fd, err = EINVAL;
     struct termios tio;
     int i;
 
-    for (i = 0; i < 3; i++) {
+    for (i = 0; i < 3 && err; i++) {
         err = 0;
         snprintf(buf, sizeof buf, "/proc/%d/fd/%d", pid, i);
 
@@ -300,6 +317,54 @@ int copy_tty_state(pid_t pid, const char *pty) {
     return -err;
 }
 
+int check_pgroup(pid_t target) {
+    pid_t pg;
+    DIR *dir;
+    struct dirent *d;
+    pid_t pid;
+    char *p;
+    int err = 0;
+    struct proc_stat pid_stat;
+
+    debug("Checking for problematic process group members...");
+
+    pg = getpgid(target);
+    if (pg < 0) {
+        error("Unable to get pgid (does process %d exist?)", (int)target);
+        return pg;
+    }
+
+    if ((dir = opendir("/proc/")) == NULL)
+        return errno;
+
+    while ((d = readdir(dir)) != NULL) {
+        if (d->d_name[0] == '.') continue;
+        pid = strtol(d->d_name, &p, 10);
+        if (*p) continue;
+        if (pid == target) continue;
+        if (getpgid(pid) == pg) {
+            /*
+             * We are actually being somewhat overly-conservative here
+             * -- if pid is a child of target, and has not yet called
+             * execve(), reptyr's setpgid() strategy may suffice. That
+             * is a fairly rare case, and annoying to check for, so
+             * for now let's just bail out.
+             */
+            if ((err = read_proc_stat(pid, &pid_stat))) {
+                memcpy(pid_stat.comm, "???", 4);
+            }
+            error("Process %d (%.*s) shares %d's process group. Unable to attach.\n"
+                  "(This most commonly means that %d has a suprocesses).",
+                  (int)pid, TASK_COMM_LENGTH, pid_stat.comm, (int)target, (int)target);
+            err = EINVAL;
+            goto out;
+        }
+    }
+ out:
+    closedir(dir);
+    return err;
+}
+
 int attach_child(pid_t pid, const char *pty, int force_stdio) {
     struct ptrace_child child;
     unsigned long scratch_page = -1;
@@ -309,6 +374,10 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
     long page_size = sysconf(_SC_PAGE_SIZE);
     char stat_path[PATH_MAX];
     long mmap_syscall;
+
+    if ((err = check_pgroup(pid))) {
+        return err;
+    }
 
     if ((err = copy_tty_state(pid, pty))) {
         if (err == ENOTTY && !force_stdio) {

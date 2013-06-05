@@ -1,4 +1,4 @@
-CFLAGS=-Wall -Werror -D_GNU_SOURCE -g
+override CFLAGS+=-Wall -Werror -D_GNU_SOURCE -g
 OBJS=reptyr.o ptrace.o attach.o
 
 PREFIX=/usr/local
@@ -19,3 +19,5 @@ install: reptyr
 	install -m 755 reptyr $(DESTDIR)$(PREFIX)/bin/reptyr
 	install -d -m 755 $(DESTDIR)$(PREFIX)/share/man/man1
 	install -m 644 reptyr.1 $(DESTDIR)$(PREFIX)/share/man/man1/reptyr.1
+	install -d -m 755 $(DESTDIR)$(PREFIX)/share/man/fr/man1
+	install -m 644 reptyr.fr.1 $(DESTDIR)$(PREFIX)/share/man/fr/man1/reptyr.1

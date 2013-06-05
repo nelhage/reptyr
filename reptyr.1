@@ -6,7 +6,7 @@ reptyr \- Reparent a running program to a new terminal
 .B reptyr
 .I PID
 
-.B reptyr \-l
+.B reptyr \-l|\-L [COMMAND [ARGS]]
 
 .SH DESCRIPTION
 
@@ -22,7 +22,6 @@ on home.
 .B reptyr
 works by attaching to the target program using
 .BR ptrace (2),
-
 redirecting relevant file descriptors, and changing the program's controlling
 terminal (See
 .BR tty (4))
@@ -46,7 +45,7 @@ the shell without doing so.
 
 .SH OPTIONS
 
-.B \-l
+.B \-l, \-L [COMMAND [ARGS]]
 .IP
 Instead of attaching to a new process, create a new pty pair, proxy the master
 end to the current terminal, and then print the name of the slave pty. This can
@@ -54,6 +53,24 @@ be passed to e.g.
 .B gdb\'s
 .I set inferior-tty
 option.
+
+If an optional
+.B COMMAND
+and
+.B ARGS
+are passed in conjunction with
+.B -l,
+that command will be executed as a child of
+.B reptyr
+with the
+.B REPTYR_PTY
+environment variable set to the name of the slave pty. If
+.B -L
+is used instead of
+.B -l,
+then fds 0-2 of the child will also be redirected to point to the
+slave, and the child will be run in a fresh session with the slave as
+its controlling terminal.
 .LP
 
 .B \-s
@@ -77,6 +94,11 @@ and exit.
 .B \-h
 .IP
 Print a usage message and exit.
+.LP
+
+.B \-V
+.IP
+Print verbose debug output while running.
 .LP
 
 .SH NOTES

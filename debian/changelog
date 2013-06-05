@@ -1,3 +1,9 @@
+reptyr (0.5-1) UNRELEASED; urgency=low
+
+  * New release (Closes: #711020)
+
+ -- Evan Broder <evan@ebroder.net>  Wed, 05 Jun 2013 16:10:29 -0700
+
 reptyr (0.3-2) unstable; urgency=low
 
   * Bump standards version to 3.9.2 (no changes).
