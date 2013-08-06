@@ -20,6 +20,7 @@
  * THE SOFTWARE.
  */
 #include <sys/ptrace.h>
+#include <linux/ptrace.h>
 #include <sys/user.h>
 #include <unistd.h>
 
