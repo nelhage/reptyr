@@ -20,9 +20,26 @@
  * THE SOFTWARE.
  */
 #include <sys/ptrace.h>
-#include <linux/ptrace.h>
 #include <sys/user.h>
 #include <unistd.h>
+
+/*
+ * See https://github.com/nelhage/reptyr/issues/25 an
+ * dhttps://github.com/nelhage/reptyr/issues/26.
+ *
+ * Older glibc's don't define PTRACE_{SETOPTIONS,GETEVENTMSG}, (but do
+ * in linux/ptrace.h), but on newer systems sys/ptrace.h and
+ * linux/ptrace.h conflict. If we were using autoconf or something, we
+ * could potentially detect the right headers at configure-time, but
+ * I'd like to avoid adding autoconf. These numbers can't ever change
+ * for ABI-compatibility reasons, at least.
+ */
+#ifndef PTRACE_SETOPTIONS
+#define PTRACE_SETOPTIONS   0x4200
+#endif
+#define PTRACE_GETEVENTMSG  0x4201
+#ifndef PTRACE_GETEVENTMSG
+#endif
 
 enum child_state {
     ptrace_detached = 0,
