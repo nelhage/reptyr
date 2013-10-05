@@ -189,6 +189,7 @@ int main(int argc, char **argv) {
     struct sigaction act;
     int pty;
     int arg = 1;
+    int err;
     int do_attach = 1;
     int force_stdio = 0;
     int unattached_script_redirection = 0;
@@ -234,6 +235,16 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    pid_t child = atoi(argv[arg]);
+    if ((err = steal_pty(child, &pty))) {
+        fprintf(stderr, "Unable to attach to pid %d: %s\n", child, strerror(err));
+        if (err == EPERM) {
+            check_yama_ptrace_scope();
+        }
+        return 1;
+    }
+
+#if 0
     if ((pty = open("/dev/ptmx", O_RDWR|O_NOCTTY)) < 0)
         die("Unable to open /dev/ptmx: %m");
     if (unlockpt(pty) < 0)
@@ -243,7 +254,6 @@ int main(int argc, char **argv) {
 
     if (do_attach) {
         pid_t child = atoi(argv[arg]);
-        int err;
         if ((err = attach_child(child, ptsname(pty), force_stdio))) {
             fprintf(stderr, "Unable to attach to pid %d: %s\n", child, strerror(err));
             if (err == EPERM) {
@@ -270,6 +280,9 @@ int main(int argc, char **argv) {
             }
         }
     }
+#endif
+    (void)force_stdio;
+    (void)unattached_script_redirection;
 
     setup_raw(&saved_termios);
     memset(&act, 0, sizeof act);

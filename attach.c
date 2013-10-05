@@ -20,6 +20,7 @@
  * THE SOFTWARE.
  */
 #include <sys/types.h>
+#include <stdint.h>
 #include <dirent.h>
 #include <sys/syscall.h>
 #include <sys/mman.h>
@@ -36,6 +37,8 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 
 #include "ptrace.h"
 #include "reptyr.h"
@@ -365,6 +368,27 @@ int check_pgroup(pid_t target) {
     return err;
 }
 
+int mmap_scratch(struct ptrace_child *child, unsigned long *addr) {
+    long mmap_syscall;
+    unsigned long scratch_page;
+
+    mmap_syscall = ptrace_syscall_numbers(child)->nr_mmap2;
+    if (mmap_syscall == -1)
+        mmap_syscall = ptrace_syscall_numbers(child)->nr_mmap;
+    scratch_page = ptrace_remote_syscall(child, mmap_syscall, 0,
+                                         sysconf(_SC_PAGE_SIZE), PROT_READ|PROT_WRITE,
+                                         MAP_ANONYMOUS|MAP_PRIVATE, 0, 0);
+
+    if (scratch_page > (unsigned long)-1000) {
+        return -(signed long)scratch_page;
+    }
+
+    *addr = scratch_page;
+    debug("Allocated scratch page: %lx", scratch_page);
+
+    return 0;
+}
+
 int attach_child(pid_t pid, const char *pty, int force_stdio) {
     struct ptrace_child child;
     unsigned long scratch_page = -1;
@@ -373,7 +397,6 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
     int err = 0;
     long page_size = sysconf(_SC_PAGE_SIZE);
     char stat_path[PATH_MAX];
-    long mmap_syscall;
 
     if ((err = check_pgroup(pid))) {
         return err;
@@ -411,19 +434,8 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
         goto out_detach;
     }
 
-    mmap_syscall = ptrace_syscall_numbers(&child)->nr_mmap2;
-    if (mmap_syscall == -1)
-        mmap_syscall = ptrace_syscall_numbers(&child)->nr_mmap;
-    scratch_page = ptrace_remote_syscall(&child, mmap_syscall, 0,
-                                         page_size, PROT_READ|PROT_WRITE,
-                                         MAP_ANONYMOUS|MAP_PRIVATE, 0, 0);
-
-    if (scratch_page > (unsigned long)-1000) {
-        err = -(signed long)scratch_page;
+    if ((err = mmap_scratch(&child, &scratch_page)))
         goto out_unmap;
-    }
-
-    debug("Allocated scratch page: %lx", scratch_page);
 
     if (force_stdio) {
         child_tty_fds = malloc(3 * sizeof(int));
@@ -510,4 +522,190 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
     close(statfd);
 
     return err < 0 ? -err : err;
+}
+
+struct steal_pty_state {
+    char tmpdir[PATH_MAX];
+    union {
+        struct sockaddr addr;
+        struct sockaddr_un addr_un;
+    };
+    int sockfd;
+    struct ptrace_child child;
+    unsigned long child_scratch;
+    int saved_regs;
+    int child_fd;
+
+    int ptyfd;
+};
+
+int setup_steal_socket(struct steal_pty_state *steal) {
+    strcpy(steal->tmpdir, "/tmp/reptyr.XXXXXX");
+    if (mkdtemp(steal->tmpdir) == NULL)
+        return errno;
+
+    steal->addr_un.sun_family = AF_UNIX;
+    snprintf(steal->addr_un.sun_path, sizeof(steal->addr_un.sun_path),
+             "%s/reptyr.sock", steal->tmpdir);
+
+    if ((steal->sockfd = socket(AF_UNIX, SOCK_DGRAM, 0)) < 0)
+        return errno;
+
+    if (bind(steal->sockfd, &steal->addr, sizeof(steal->addr_un)) < 0)
+        return errno;
+
+    return 0;
+};
+
+int setup_steal_socket_child(struct steal_pty_state *steal) {
+    int err;
+    err = do_syscall(&steal->child, socket, AF_UNIX, SOCK_DGRAM, 0, 0, 0, 0);
+    if (err < 0)
+        return -err;
+    steal->child_fd = err;
+    debug("Opened fd %d in the child.", steal->child_fd);
+    err = ptrace_memcpy_to_child(&steal->child, steal->child_scratch,
+                                 &steal->addr_un, sizeof(steal->addr_un));
+    if (err < 0)
+        return steal->child.error;
+    err = do_syscall(&steal->child, connect, steal->child_fd, steal->child_scratch,
+                     sizeof(steal->addr_un),0,0,0);
+    if (err < 0)
+        return -err;
+    debug("Connected to the shared socket.");
+    return 0;
+}
+
+int steal_child_pty(struct steal_pty_state *steal) {
+    struct {
+        struct msghdr msg;
+        unsigned char buf[CMSG_SPACE(sizeof(int))];
+    } buf = {};
+    struct cmsghdr *cm;
+    int fd = 5;
+    int err;
+
+    buf.msg.msg_control = buf.buf;
+    buf.msg.msg_controllen = CMSG_SPACE(sizeof(int));
+    cm = CMSG_FIRSTHDR(&buf.msg);
+    cm->cmsg_level = SOL_SOCKET;
+    cm->cmsg_type  = SCM_RIGHTS;
+    cm->cmsg_len   = CMSG_LEN(sizeof(int));
+    memcpy(CMSG_DATA(cm), &fd, sizeof(int));
+    buf.msg.msg_controllen = cm->cmsg_len;
+
+    // Relocate for the child
+    buf.msg.msg_control = (void*)(steal->child_scratch +
+                                  ((uint8_t*)buf.msg.msg_control - (uint8_t*)&buf));
+
+    if (ptrace_memcpy_to_child(&steal->child,
+                               steal->child_scratch,
+                               &buf, sizeof(buf))) {
+        return steal->child.error;
+    }
+
+    steal->child.error = 0;
+    err = do_syscall(&steal->child, sendmsg,
+                     steal->child_fd,
+                     steal->child_scratch,
+                     MSG_DONTWAIT, 0,0,0);
+    if (err < 0) {
+        return steal->child.error ? steal->child.error : -err;
+    }
+
+    debug("Sent the pty fd, going to receive it.");
+
+    buf.msg.msg_control = buf.buf;
+    buf.msg.msg_controllen = CMSG_SPACE(sizeof(int));
+
+    err = recvmsg(steal->sockfd, &buf.msg, MSG_DONTWAIT);
+    if (err < 0) {
+        error("Error receiving message.");
+        return errno;
+    }
+
+    debug("Got a message: %d bytes, %ld control",
+          err, (long)buf.msg.msg_controllen);
+
+    if (buf.msg.msg_controllen < CMSG_LEN(sizeof(int))) {
+        error("No fd received?");
+        return EINVAL;
+    }
+
+    memcpy(&steal->ptyfd, CMSG_DATA(cm), sizeof(fd));
+
+    debug("Got tty fd: %d", steal->ptyfd);
+
+    return 0;
+}
+
+int steal_pty(pid_t pid, int *pty) {
+    int err = 0;
+    struct steal_pty_state steal = {};
+    long page_size = sysconf(_SC_PAGE_SIZE);
+
+    if ((err = setup_steal_socket(&steal)))
+        goto out;
+
+    debug("Listening on socket: %s", steal.addr_un.sun_path);
+
+    if (ptrace_attach_child(&steal.child, pid)) {
+        err = steal.child.error;
+        goto out;
+    }
+    if (ptrace_advance_to_state(&steal.child, ptrace_at_syscall)) {
+        err = steal.child.error;
+        goto out;
+    }
+    if (ptrace_save_regs(&steal.child)) {
+        err = steal.child.error;
+        goto out;
+    }
+
+    debug("Attached to child.");
+
+    steal.saved_regs = 1;
+
+    if ((err = mmap_scratch(&steal.child, &steal.child_scratch)))
+        goto out;
+
+    if ((err = setup_steal_socket_child(&steal)))
+        goto out;
+
+    if ((err = steal_child_pty(&steal)))
+        goto out;
+
+    *pty = steal.ptyfd;
+
+    kill(steal.child.pid, SIGKILL);
+    ptrace_detach_child(&steal.child);
+    ptrace_wait(&steal.child);
+
+    goto out_no_child;
+
+out:
+    if (steal.child_fd > 0)
+        do_syscall(&steal.child, close, steal.child_fd, 0, 0, 0, 0, 0);
+
+    if (steal.child_scratch > 0)
+        do_unmap(&steal.child, steal.child_scratch, page_size);
+
+    if (steal.child.state != ptrace_detached) {
+        if (steal.saved_regs)
+            ptrace_restore_regs(&steal.child);
+        ptrace_detach_child(&steal.child);
+    }
+
+out_no_child:
+
+    if (steal.sockfd > 0) {
+        close(steal.sockfd);
+        unlink(steal.addr_un.sun_path);
+    }
+
+    if (steal.tmpdir[0]) {
+        rmdir(steal.tmpdir);
+    }
+
+    return err;
 }

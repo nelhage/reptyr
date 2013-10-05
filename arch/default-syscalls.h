@@ -27,6 +27,9 @@
     SC(close),
     SC(ioctl),
     SC(dup2),
+    SC(socket),
+    SC(connect),
+    SC(sendmsg),
 },
 
 #undef SC
