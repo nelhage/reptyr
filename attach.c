@@ -98,7 +98,7 @@ static void do_unmap(struct ptrace_child *child, child_addr_t addr, unsigned lon
 
 int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
     struct proc_stat child_status;
-    struct stat tty_st, st;
+    struct stat tty_st, console_st, st;
     char buf[PATH_MAX];
     int n = 0, allocated = 0;
     int *fds = NULL;
@@ -118,6 +118,12 @@ int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
         return NULL;
     }
 
+    if (stat("/dev/console", &console_st) < 0) {
+        child->error = errno;
+        error("Unable to stat /dev/console");
+        return NULL;
+    }
+
     snprintf(buf, sizeof buf, "/proc/%d/fd/", child->pid);
     if ((dir = opendir(buf)) == NULL)
         return NULL;
@@ -128,7 +134,8 @@ int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
             continue;
 
         if (st.st_rdev == child_status.ctty
-            || st.st_rdev == tty_st.st_rdev) {
+            || st.st_rdev == tty_st.st_rdev
+            || st.st_rdev == console_st.st_rdev) {
             if (n == allocated) {
                 allocated = allocated ? 2 * allocated : 2;
                 tmp = realloc(fds, allocated * sizeof *tmp);
