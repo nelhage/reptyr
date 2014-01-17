@@ -1,7 +1,7 @@
 override CFLAGS+=-Wall -Werror -D_GNU_SOURCE -g
 OBJS=reptyr.o ptrace.o attach.o
 
-PREFIX=/usr/local
+PREFIX ?= /usr/local
 
 all: reptyr
 
