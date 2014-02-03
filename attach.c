@@ -53,19 +53,26 @@ struct proc_stat {
     ptrace_remote_syscall((child), ptrace_syscall_numbers((child))->nr_##name, \
                           a0, a1, a2, a3, a4, a5)
 
+#define assert_nonzero(expr) ({                         \
+            typeof(expr) __val = expr;                  \
+            if (__val == 0)                             \
+                die("Unexpected: %s == 0!\n", #expr);   \
+            __val;                                      \
+        })
+
 int parse_proc_stat(int statfd, struct proc_stat *out) {
     char buf[1024];
     int n;
     unsigned dev;
     lseek(statfd, 0, SEEK_SET);
     if (read(statfd, buf, sizeof buf) < 0)
-        return errno;
+        return assert_nonzero(errno);
     n = sscanf(buf, "%d (%16[^)]) %c %d %d %d %u",
                &out->pid, out->comm,
                &out->state, &out->ppid, &out->sid,
                &out->pgid, &dev);
     if (n == EOF)
-        return errno;
+        return assert_nonzero(errno);
     if (n != 7) {
         return EINVAL;
     }
@@ -113,7 +120,7 @@ int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
     debug("Resolved child tty: %x", (unsigned)child_status.ctty);
 
     if (stat("/dev/tty", &tty_st) < 0) {
-        child->error = errno;
+        child->error = assert_nonzero(errno);
         error("Unable to stat /dev/tty");
         return NULL;
     }
@@ -140,7 +147,7 @@ int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
                 allocated = allocated ? 2 * allocated : 2;
                 tmp = realloc(fds, allocated * sizeof *tmp);
                 if (tmp == NULL) {
-                  child->error = errno;
+                  child->error = assert_nonzero(errno);
                   error("Unable to allocate memory for fd array.");
                   free(fds);
                   fds = NULL;
@@ -306,7 +313,7 @@ int copy_tty_state(pid_t pid, const char *pty) {
         }
 
         if (tcgetattr(fd, &tio) < 0) {
-            err = -errno;
+            err = -assert_nonzero(errno);
         }
     retry:
         close(fd);
@@ -316,10 +323,10 @@ int copy_tty_state(pid_t pid, const char *pty) {
         return err;
 
     if ((fd = open(pty, O_RDONLY)) < 0)
-        return -errno;
+        return -assert_nonzero(errno);
 
     if (tcsetattr(fd, TCSANOW, &tio) < 0)
-        err = errno;
+        err = assert_nonzero(errno);
     close(fd);
     return -err;
 }
@@ -342,7 +349,7 @@ int check_pgroup(pid_t target) {
     }
 
     if ((dir = opendir("/proc/")) == NULL)
-        return errno;
+        return assert_nonzero(errno);
 
     while ((d = readdir(dir)) != NULL) {
         if (d->d_name[0] == '.') continue;
