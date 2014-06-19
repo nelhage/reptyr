@@ -32,6 +32,7 @@
 #include <termios.h>
 #include <signal.h>
 
+#include "config.h"
 #include "reptyr.h"
 
 #ifndef __linux__

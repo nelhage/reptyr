@@ -37,6 +37,7 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 
+#include "config.h"
 #include "ptrace.h"
 #include "reptyr.h"
 
@@ -145,15 +146,16 @@ int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
             || st.st_rdev == console_st.st_rdev) {
             if (n == allocated) {
                 allocated = allocated ? 2 * allocated : 2;
-                tmp = realloc(fds, allocated * sizeof *tmp);
-                if (tmp == NULL) {
-                  child->error = assert_nonzero(errno);
-                  error("Unable to allocate memory for fd array.");
-                  free(fds);
-                  fds = NULL;
-                  goto out;
-                }
-                fds = tmp;
+				errno = 0;
+				tmp = reallocarray(fds, allocated, sizeof *tmp);
+				if (tmp == NULL) {
+				  child->error = assert_nonzero(errno);
+				  error("Unable to allocate memory for fd array.");
+				  free(fds);
+				  fds = NULL;
+				  goto out;
+				}
+				fds = tmp;
             }
             debug("Found an alias for the tty: %s", d->d_name);
             fds[n++] = atoi(d->d_name);

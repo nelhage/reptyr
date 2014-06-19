@@ -1,25 +1,28 @@
 AC_INIT([reptyr], [0.5])
-AM_INIT_AUTOMAKE([foreign no-define])
 AM_SILENT_RULES([yes])
+AC_CONFIG_LIBOBJ_DIR([compat])
+AC_CONFIG_HEADERS([config.h])
+AC_CONFIG_AUX_DIR([build-aux])
+AM_INIT_AUTOMAKE([foreign no-define subdir-objects])
 
 AC_PROG_CC
 AC_LANG_C
 
 AC_PROG_MAKE_SET
+AC_PROG_INSTALL
 
 AC_HEADER_STDC
 AC_HEADER_STAT
 AC_HEADER_SYS_WAIT
 
-AC_FUNC_MALLOC
-AC_FUNC_REALLOC
-AC_FUNC_STAT
-AC_FUNC_VPRINTF
-AC_FUNC_FORK
+AC_CHECK_DECLS(reallocarray)
+AC_REPLACE_FUNCS(reallocarray)
 
-AC_CHECK_FUNCS([ptrace])
-if test "x$ac_cv_func_ptrace" = xno; then
-	AC_MSG_ERROR([ptrace required])
-fi
+AH_BOTTOM([#ifndef HAVE_REALLOCARRAY
+void *
+reallocarray(void *optr, size_t nmemb, size_t size);
+#endif
+])
+
 
 AC_OUTPUT([Makefile])

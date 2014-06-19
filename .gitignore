@@ -15,3 +15,11 @@ Makefile.in
 /install-sh
 /missing
 /stamp-h1
+/config.h
+/config.h.in
+/config.h.in~
+/config.log
+/config.status
+Makefile
+.deps
+/build-aux
