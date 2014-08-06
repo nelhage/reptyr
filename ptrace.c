@@ -53,10 +53,10 @@
 #define PTRACE_EVENT_FORK 1
 #endif
 
-#define min(x, y) ({				\
-	typeof(x) _min1 = (x);			\
-	typeof(y) _min2 = (y);			\
-	_min1 < _min2 ? _min1 : _min2; })
+#define min(x, y) ({                \
+    typeof(x) _min1 = (x);          \
+    typeof(y) _min2 = (y);          \
+    _min1 < _min2 ? _min1 : _min2; })
 
 static long __ptrace_command(struct ptrace_child *child, enum __ptrace_request req,
                              void *, void*);
@@ -146,10 +146,14 @@ int ptrace_detach_child(struct ptrace_child *child) {
 }
 
 int ptrace_wait(struct ptrace_child *child) {
-    if (waitpid(child->pid, &child->status, 0) < 0) {
-        child->error = errno;
-        return -1;
-    }
+    do {
+        errno = 0;
+        if (waitpid(child->pid, &child->status, 0) < 0 && errno != EINTR) {
+            child->error = errno;
+            return -1;
+        }
+    } while (errno == EINTR);
+
     if (WIFEXITED(child->status) || WIFSIGNALED(child->status)) {
         child->state = ptrace_exited;
     } else if (WIFSTOPPED(child->status)) {

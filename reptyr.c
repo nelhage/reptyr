@@ -234,8 +234,12 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if ((pty = open("/dev/ptmx", O_RDWR|O_NOCTTY)) < 0)
-        die("Unable to open /dev/ptmx: %m");
+    do {
+        errno = 0;
+        if ((pty = open("/dev/ptmx", O_RDWR|O_NOCTTY)) < 0 && errno != EINTR)
+            die("Unable to open /dev/ptmx: %m");
+    } while (errno == EINTR);
+
     if (unlockpt(pty) < 0)
         die("Unable to unlockpt: %m");
     if (grantpt(pty) < 0)
@@ -255,18 +259,74 @@ int main(int argc, char **argv) {
         printf("Opened a new pty: %s\n", ptsname(pty));
         fflush(stdout);
         if (argc > 2) {
-            if(!fork()) {
-                setenv("REPTYR_PTY", ptsname(pty), 1);
-                if (unattached_script_redirection) {
-                    int f;
-                    setpgid(0, getppid());
-                    setsid();
-                    f = open(ptsname(pty), O_RDONLY, 0); dup2(f, 0);            close(f);
-                    f = open(ptsname(pty), O_WRONLY, 0); dup2(f, 1); dup2(f,2); close(f);
-                }
-                close(pty);
-                execvp(argv[2], argv+2);
-                exit(1);
+            switch (fork()) {
+                case -1:
+                    die("Unable to fork child: %s", strerror(errno));
+                case 0:
+                    break;
+                default:
+                    if (setenv("REPTYR_PTY", ptsname(pty), 1))
+                        die("Unable to setenv REPTYR_PTY: %s", strerror(errno));
+
+                    if (unattached_script_redirection) {
+                        int f;
+                        if (setpgid(0, getppid()))
+                            die("Unable to set pgid: %s", strerror(errno));
+
+                        if (setsid())
+                            die("Unable to set sid: %s", strerror(errno));
+
+                        do {
+                            errno = 0;
+                            if ((f = open(ptsname(pty), O_RDONLY, 0)) == -1 && errno != EINTR)
+                                die("Failed to open pty: %s", strerror(errno));
+                        } while (errno == EINTR);
+
+                        do {
+                            errno = 0;
+                            if (dup2(f, 0) == -1 && errno != EINTR)
+                                die("Failed to dup2 stdin: %s", strerror(errno));
+                        } while (errno == EINTR);
+
+                        do {
+                            errno = 0;
+                            if (close(f) && errno != EINTR)
+                                die("Failed to close pty: %s", strerror(errno));
+                        } while (errno == EINTR);
+
+                        do {
+                            errno = 0;
+                            if ((f = open(ptsname(pty), O_WRONLY, 0)) == -1 && errno != EINTR)
+                                die("Failed to open pty: %s", strerror(errno));
+                        } while (errno == EINTR);
+
+                        do {
+                            errno = 0;
+                            if (dup2(f, 1) == -1 && errno != EINTR)
+                                die("Failed to dup2 stdout: %s", strerror(errno));
+                        } while (errno == EINTR);
+
+                        do {
+                            errno = 0;
+                            if (dup2(f,2) == -1 && errno != EINTR)
+                                die("Failed to dup2 stderr: %s", strerror(errno));
+                        } while (errno == EINTR);
+
+                        do {
+                            errno = 0;
+                            if (close(f) && errno != EINTR)
+                                die("Failed to close pty: %s", strerror(errno));
+                        } while (errno == EINTR);
+                    }
+
+                    do {
+                        errno = 0;
+                        if (close(pty) && errno != EINTR)
+                            die("Failed to close pty: %s", strerror(errno));
+                    } while (errno == EINTR);
+
+                    execvp(argv[2], argv+2);
+                    exit(1);
             }
         }
     }
