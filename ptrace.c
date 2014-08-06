@@ -34,6 +34,7 @@
 #include <assert.h>
 #include <stddef.h>
 
+#include "config.h"
 #include "ptrace.h"
 
 /*
