@@ -344,8 +344,8 @@ int check_pgroup(pid_t target) {
 
     pg = getpgid(target);
     if (pg < 0) {
-        error("Unable to get pgid (does process %d exist?)", (int)target);
-        return pg;
+        error("Unable to get pgid for pid %d", (int)target);
+        return errno;
     }
 
     if ((dir = opendir("/proc/")) == NULL)
