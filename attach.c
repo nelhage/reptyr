@@ -65,14 +65,23 @@ int parse_proc_stat(int statfd, struct proc_stat *out) {
     int n;
     unsigned dev;
     lseek(statfd, 0, SEEK_SET);
-    if (read(statfd, buf, sizeof buf) < 0)
-        return assert_nonzero(errno);
-    n = sscanf(buf, "%d (%16[^)]) %c %d %d %d %u",
-               &out->pid, out->comm,
-               &out->state, &out->ppid, &out->sid,
-               &out->pgid, &dev);
-    if (n == EOF)
-        return assert_nonzero(errno);
+
+    do {
+        errno = 0;
+        if (read(statfd, buf, sizeof buf) < 0 && errno != EINTR)
+            return assert_nonzero(errno);
+    } while (errno == EINTR);
+
+    do {
+        errno = 0;
+        n = sscanf(buf, "%d (%16[^)]) %c %d %d %d %u",
+                   &out->pid, out->comm,
+                   &out->state, &out->ppid, &out->sid,
+                   &out->pgid, &dev);
+        if (n == EOF && errno != EINTR)
+            return assert_nonzero(errno);
+    } while (errno == EINTR);
+
     if (n != 7) {
         return EINVAL;
     }
@@ -86,14 +95,24 @@ int read_proc_stat(pid_t pid, struct proc_stat *out) {
     int err;
 
     snprintf(stat_path, sizeof stat_path, "/proc/%d/stat", pid);
-    statfd = open(stat_path, O_RDONLY);
-    if (statfd < 0) {
-        error("Unable to open %s: %s", stat_path, strerror(errno));
-        return -statfd;
-    }
+
+    do {
+        errno = 0;
+        statfd = open(stat_path, O_RDONLY);
+        if (statfd < 0 && errno != EINTR) {
+            error("Unable to open %s: %s", stat_path, strerror(errno));
+            return -statfd;
+        }
+    } while (errno == EINTR);
 
     err = parse_proc_stat(statfd, out);
-    close(statfd);
+
+    do {
+        errno = 0;
+        if (close(statfd) && errno != EINTR)
+            return errno;
+    } while (errno == EINTR);
+
     return err;
 }
 
@@ -322,12 +341,21 @@ int copy_tty_state(pid_t pid, const char *pty) {
     if (err)
         return err;
 
-    if ((fd = open(pty, O_RDONLY)) < 0)
-        return -assert_nonzero(errno);
+    do {
+        errno = 0;
+        if ((fd = open(pty, O_RDONLY)) < 0 && errno != EINTR)
+            return -assert_nonzero(errno);
+    } while (errno == EINTR);
 
     if (tcsetattr(fd, TCSANOW, &tio) < 0)
         err = assert_nonzero(errno);
-    close(fd);
+
+    do {
+        errno = 0;
+        if (close(fd) && errno != EINTR)
+            err = assert_nonzero(errno);
+    } while (errno == EINTR);
+
     return -err;
 }
 
@@ -402,11 +430,15 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
     }
 
     snprintf(stat_path, sizeof stat_path, "/proc/%d/stat", pid);
-    statfd = open(stat_path, O_RDONLY);
-    if (statfd < 0) {
-        error("Unable to open %s: %s", stat_path, strerror(errno));
-        return -statfd;
-    }
+
+    do {
+        errno = 0;
+        statfd = open(stat_path, O_RDONLY);
+        if (statfd < 0 && errno != EINTR) {
+            error("Unable to open %s: %s", stat_path, strerror(errno));
+            return -statfd;
+        }
+    } while (errno == EINTR);
 
     kill(pid, SIGTSTP);
     wait_for_stop(pid, statfd);
