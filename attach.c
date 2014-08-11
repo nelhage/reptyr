@@ -586,7 +586,7 @@ int get_terminal_state(struct steal_pty_state *steal, pid_t target) {
     if ((err = read_proc_stat(target, &steal->target_stat)))
         return err;
 
-    if ((steal->target_stat.ctty >> 8) != UNIX98_PTY_SLAVE_MAJOR) {
+    if (major(steal->target_stat.ctty) != UNIX98_PTY_SLAVE_MAJOR) {
         error("Child is not connected to a pseudo-TTY. Unable to steal TTY.");
         return EINVAL;
     }
