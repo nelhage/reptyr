@@ -39,6 +39,7 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <linux/major.h>
 
 #include "ptrace.h"
 #include "reptyr.h"
@@ -389,6 +390,36 @@ int mmap_scratch(struct ptrace_child *child, unsigned long *addr) {
     return 0;
 }
 
+int grab_pid(pid_t pid, struct ptrace_child *child, unsigned long *scratch) {
+    int err;
+
+    if (ptrace_attach_child(child, pid)) {
+        err = child->error;
+        goto out;
+    }
+    if (ptrace_advance_to_state(child, ptrace_at_syscall)) {
+        err = child->error;
+        goto out;
+    }
+    if (ptrace_save_regs(child)) {
+        err = child->error;
+        goto out;
+    }
+
+    if ((err = mmap_scratch(child, scratch)))
+        goto out_restore_regs;
+
+    return 0;
+
+ out_restore_regs:
+    ptrace_restore_regs(child);
+
+ out:
+    ptrace_detach_child(child);
+
+    return err;
+}
+
 int attach_child(pid_t pid, const char *pty, int force_stdio) {
     struct ptrace_child child;
     unsigned long scratch_page = -1;
@@ -420,22 +451,9 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
     kill(pid, SIGTSTP);
     wait_for_stop(pid, statfd);
 
-    if (ptrace_attach_child(&child, pid)) {
-        err = child.error;
+    if ((err = grab_pid(pid, &child, &scratch_page))) {
         goto out_cont;
     }
-
-    if (ptrace_advance_to_state(&child, ptrace_at_syscall)) {
-        err = child.error;
-        goto out_detach;
-    }
-    if (ptrace_save_regs(&child)) {
-        err = child.error;
-        goto out_detach;
-    }
-
-    if ((err = mmap_scratch(&child, &scratch_page)))
-        goto out_unmap;
 
     if (force_stdio) {
         child_tty_fds = malloc(3 * sizeof(int));
@@ -509,7 +527,6 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
     do_unmap(&child, scratch_page, page_size);
 
     ptrace_restore_regs(&child);
- out_detach:
     ptrace_detach_child(&child);
 
     if (err == 0) {
@@ -525,19 +542,60 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
 }
 
 struct steal_pty_state {
+    struct proc_stat target_stat;
+
+    pid_t emulator_pid;
+    int master_fd;
+
     char tmpdir[PATH_MAX];
     union {
         struct sockaddr addr;
         struct sockaddr_un addr_un;
     };
     int sockfd;
+
     struct ptrace_child child;
     unsigned long child_scratch;
-    int saved_regs;
     int child_fd;
 
     int ptyfd;
 };
+
+// Find the PID of the terminal emulator for `target's terminal.
+//
+// We assume that the terminal emulator is the parent of the session
+// leader. This is true in most cases, although in principle you can
+// construct situations where it is false. We should fail safe later
+// on if this turns out to be wrong, however.
+int find_terminal_emulator(struct steal_pty_state *steal) {
+    debug("session leader of pid %d = %d",
+          (int)steal->target_stat.pid,
+          (int)steal->target_stat.sid);
+    struct proc_stat leader_st;
+    int err;
+    if ((err = read_proc_stat(steal->target_stat.sid, &leader_st)))
+        return err;
+    debug("found terminal emulator process: %d", (int) leader_st.ppid);
+    steal->emulator_pid = leader_st.ppid;
+    return 0;
+}
+
+int get_terminal_state(struct steal_pty_state *steal, pid_t target) {
+    int err;
+
+    if ((err = read_proc_stat(target, &steal->target_stat)))
+        return err;
+
+    if ((steal->target_stat.ctty >> 8) != UNIX98_PTY_SLAVE_MAJOR) {
+        error("Child is not connected to a pseudo-TTY. Unable to steal TTY.");
+        return EINVAL;
+    }
+
+    if ((err = find_terminal_emulator(steal)))
+        return err;
+
+    return 0;
+}
 
 int setup_steal_socket(struct steal_pty_state *steal) {
     strcpy(steal->tmpdir, "/tmp/reptyr.XXXXXX");
@@ -555,7 +613,64 @@ int setup_steal_socket(struct steal_pty_state *steal) {
         return errno;
 
     return 0;
-};
+}
+
+// ptmx(4) and Linux Documentation/devices.txt document
+// /dev/ptmx has having major 5 and minor 2. I can't find any
+// constants in headers after a brief glance that I should be
+// using here.
+#define PTMX_DEVICE (makedev(5, 2))
+
+// Find the fd in the terminal emulator process that corresponds to
+// the master side of the target's pty. Store the result in
+// steal->master_fd.
+int find_master_fd(struct steal_pty_state *steal) {
+    DIR *dir;
+    struct dirent *d;
+    struct stat st;
+    int err;
+    char buf[PATH_MAX];
+
+    snprintf(buf, sizeof buf, "/proc/%d/fd/", steal->child.pid);
+    if ((dir = opendir(buf)) == NULL)
+        return errno;
+    while ((d = readdir(dir)) != NULL) {
+        if (d->d_name[0] == '.') continue;
+        snprintf(buf, sizeof buf, "/proc/%d/fd/%s", steal->child.pid, d->d_name);
+        if (stat(buf, &st) < 0)
+            continue;
+
+        debug("Checking fd: %s: st_dev=%x", d->d_name, (int)st.st_rdev);
+
+        if (st.st_rdev != PTMX_DEVICE)
+            continue;
+
+        debug("found a ptmx fd: %s", d->d_name);
+        err = do_syscall(&steal->child, ioctl,
+                         atoi(d->d_name),
+                         TIOCGPTN,
+                         steal->child_scratch,
+                         0, 0, 0);
+        if (err < 0) {
+            debug(" error doing TIOCGPTN: %s", strerror(-err));
+            continue;
+        }
+        int ptn;
+        err = ptrace_memcpy_from_child(&steal->child, &ptn,
+                                       steal->child_scratch, sizeof(ptn));
+        if (err < 0) {
+            debug(" error getting ptn: %s", strerror(steal->child.error));
+            continue;
+        }
+        if (ptn == (int)minor(steal->target_stat.ctty)) {
+            debug("found the master fd: %d", atoi(d->d_name));
+            steal->master_fd = atoi(d->d_name);
+            return 0;
+        }
+    }
+
+    return ESRCH;
+}
 
 int setup_steal_socket_child(struct steal_pty_state *steal) {
     int err;
@@ -582,7 +697,6 @@ int steal_child_pty(struct steal_pty_state *steal) {
         unsigned char buf[CMSG_SPACE(sizeof(int))];
     } buf = {};
     struct cmsghdr *cm;
-    int fd = 5;
     int err;
 
     buf.msg.msg_control = buf.buf;
@@ -591,7 +705,7 @@ int steal_child_pty(struct steal_pty_state *steal) {
     cm->cmsg_level = SOL_SOCKET;
     cm->cmsg_type  = SCM_RIGHTS;
     cm->cmsg_len   = CMSG_LEN(sizeof(int));
-    memcpy(CMSG_DATA(cm), &fd, sizeof(int));
+    memcpy(CMSG_DATA(cm), &steal->master_fd, sizeof(int));
     buf.msg.msg_controllen = cm->cmsg_len;
 
     // Relocate for the child
@@ -632,10 +746,38 @@ int steal_child_pty(struct steal_pty_state *steal) {
         return EINVAL;
     }
 
-    memcpy(&steal->ptyfd, CMSG_DATA(cm), sizeof(fd));
+    memcpy(&steal->ptyfd, CMSG_DATA(cm), sizeof(steal->ptyfd));
 
     debug("Got tty fd: %d", steal->ptyfd);
 
+    return 0;
+}
+
+// Attach to the session leader of the stolen session, and block
+// SIGHUP so that if and when the terminal emulator tries to HUP it,
+// it doesn't die.
+int steal_block_hup(struct steal_pty_state *steal) {
+    struct ptrace_child leader;
+    unsigned long scratch;
+    int err = 0;
+
+    if ((err = grab_pid(steal->target_stat.sid, &leader, &scratch)))
+        return err;
+
+    err = ignore_hup(&leader, scratch);
+
+    ptrace_restore_regs(&leader);
+    ptrace_detach_child(&leader);
+
+    return err;
+}
+
+int steal_cleanup_child(struct steal_pty_state *steal) {
+    do_syscall(&steal->child, close, steal->master_fd, 0, 0, 0, 0, 0);
+    ptrace_restore_regs(&steal->child);
+
+    ptrace_detach_child(&steal->child);
+    ptrace_wait(&steal->child);
     return 0;
 }
 
@@ -644,30 +786,24 @@ int steal_pty(pid_t pid, int *pty) {
     struct steal_pty_state steal = {};
     long page_size = sysconf(_SC_PAGE_SIZE);
 
+    if ((err = get_terminal_state(&steal, pid)))
+        goto out;
+
     if ((err = setup_steal_socket(&steal)))
         goto out;
 
     debug("Listening on socket: %s", steal.addr_un.sun_path);
 
-    if (ptrace_attach_child(&steal.child, pid)) {
-        err = steal.child.error;
+    if ((err = grab_pid(steal.emulator_pid, &steal.child, &steal.child_scratch)))
+        goto out;
+
+    debug("Attached to terminal emulator (pid %d)",
+          (int)steal.emulator_pid);
+
+    if ((err = find_master_fd(&steal))) {
+        error("Unable to find the fd for the pty!");
         goto out;
     }
-    if (ptrace_advance_to_state(&steal.child, ptrace_at_syscall)) {
-        err = steal.child.error;
-        goto out;
-    }
-    if (ptrace_save_regs(&steal.child)) {
-        err = steal.child.error;
-        goto out;
-    }
-
-    debug("Attached to child.");
-
-    steal.saved_regs = 1;
-
-    if ((err = mmap_scratch(&steal.child, &steal.child_scratch)))
-        goto out;
 
     if ((err = setup_steal_socket_child(&steal)))
         goto out;
@@ -675,15 +811,20 @@ int steal_pty(pid_t pid, int *pty) {
     if ((err = steal_child_pty(&steal)))
         goto out;
 
-    *pty = steal.ptyfd;
+    if ((err = steal_block_hup(&steal)))
+        goto out;
 
-    kill(steal.child.pid, SIGKILL);
-    ptrace_detach_child(&steal.child);
-    ptrace_wait(&steal.child);
+    if ((err = steal_cleanup_child(&steal)))
+        goto out;
 
     goto out_no_child;
 
 out:
+    if (steal.ptyfd) {
+        close(steal.ptyfd);
+        steal.ptyfd = 0;
+    }
+
     if (steal.child_fd > 0)
         do_syscall(&steal.child, close, steal.child_fd, 0, 0, 0, 0, 0);
 
@@ -691,8 +832,7 @@ out:
         do_unmap(&steal.child, steal.child_scratch, page_size);
 
     if (steal.child.state != ptrace_detached) {
-        if (steal.saved_regs)
-            ptrace_restore_regs(&steal.child);
+        ptrace_restore_regs(&steal.child);
         ptrace_detach_child(&steal.child);
     }
 
@@ -706,6 +846,9 @@ out_no_child:
     if (steal.tmpdir[0]) {
         rmdir(steal.tmpdir);
     }
+
+    if (steal.ptyfd)
+        *pty = steal.ptyfd;
 
     return err;
 }
