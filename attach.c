@@ -66,8 +66,8 @@ int parse_proc_stat(int statfd, struct proc_stat *out) {
         return errno;
     n = sscanf(buf, "%d (%16[^)]) %c %d %d %d %u",
                &out->pid, out->comm,
-               &out->state, &out->ppid, &out->sid,
-               &out->pgid, &dev);
+               &out->state, &out->ppid, &out->pgid,
+               &out->sid, &dev);
     if (n == EOF)
         return errno;
     if (n != 7) {
