@@ -191,19 +191,15 @@ int main(int argc, char **argv) {
     struct termios saved_termios;
     struct sigaction act;
     int pty;
-    int arg = 1;
+    int opt;
     int err;
     int do_attach = 1;
     int force_stdio = 0;
     int do_steal = 0;
     int unattached_script_redirection = 0;
 
-    if (argc < 2) {
-        usage(argv[0]);
-        return 2;
-    }
-    if (argv[arg][0] == '-') {
-        switch(argv[arg][1]) {
+    while ((opt = getopt(argc, argv, "hlLsTvV")) != -1) {
+        switch(opt) {
         case 'h':
             usage(argv[0]);
             return 0;
@@ -215,11 +211,9 @@ int main(int argc, char **argv) {
             unattached_script_redirection = 1;
             break;
         case 's':
-            arg++;
             force_stdio = 1;
             break;
         case 'T':
-            arg++;
             do_steal = 1;
             break;
         case 'v':
@@ -228,7 +222,6 @@ int main(int argc, char **argv) {
             printf("http://github.com/nelhage/reptyr/\n");
             return 0;
         case 'V':
-            arg++;
             verbose = 1;
             break;
         default:
@@ -237,7 +230,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    if (do_attach && arg >= argc) {
+    if (do_attach && optind >= argc) {
         fprintf(stderr, "%s: No pid specified to attach\n", argv[0]);
         usage(argv[0]);
         return 1;
@@ -253,7 +246,7 @@ int main(int argc, char **argv) {
     }
 
     if (do_attach) {
-        pid_t child = atoi(argv[arg]);
+        pid_t child = atoi(argv[optind]);
         if (do_steal) {
             err = steal_pty(child, &pty);
         } else {
