@@ -246,7 +246,18 @@ int main(int argc, char **argv) {
     }
 
     if (do_attach) {
-        pid_t child = atoi(argv[optind]);
+        char *endptr = NULL;
+        errno = 0;
+        long t = strtol(argv[optind], &endptr, 10);
+        if (errno == ERANGE)
+            die("Invalid pid: %m");
+        if (*endptr)
+            die("Invalid pid: must be integer");
+        /* check for overflow/underflow */
+        pid_t child = (pid_t)t;
+        if (child < t || t < 1) /* pids can't be < 1, so no *real* underflow check */
+            die("Invalid pid: %s", strerror(ERANGE));
+
         if (do_steal) {
             err = steal_pty(child, &pty);
         } else {
