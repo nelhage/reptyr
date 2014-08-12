@@ -76,6 +76,9 @@ struct syscall_numbers {
     long nr_close;
     long nr_ioctl;
     long nr_dup2;
+    long nr_socket;
+    long nr_connect;
+    long nr_sendmsg;
 };
 
 typedef unsigned long child_addr_t;
