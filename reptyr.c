@@ -278,7 +278,11 @@ int main(int argc, char **argv) {
     sigaction(SIGWINCH, &act, NULL);
     resize_pty(pty);
     do_proxy(pty);
-    tcsetattr(0, TCSANOW, &saved_termios);
+    do {
+        errno = 0;
+        if (tcsetattr(0, TCSANOW, &saved_termios) && errno != EINTR)
+            die("Unable to tcsetattr: %m");
+    } while (errno == EINTR);
 
     return 0;
 }
