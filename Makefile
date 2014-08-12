@@ -1,5 +1,5 @@
 override CFLAGS+=-Wall -Werror -D_GNU_SOURCE -g
-OBJS=reptyr.o ptrace.o attach.o
+OBJS=reptyr.o ptrace.o reallocarray.o attach.o
 
 # Note that because of how Make works, this can be overriden from the
 # command-line.
@@ -12,7 +12,7 @@ all: reptyr
 reptyr: $(OBJS)
 
 attach.o: reptyr.h ptrace.h
-reptyr.o: reptyr.h
+reptyr.o: reptyr.h reallocarray.h
 ptrace.o: ptrace.h $(wildcard arch/*.h)
 
 clean:

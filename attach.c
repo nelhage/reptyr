@@ -39,6 +39,7 @@
 
 #include "ptrace.h"
 #include "reptyr.h"
+#include "reallocarray.h"
 
 #define TASK_COMM_LENGTH 16
 struct proc_stat {
@@ -145,7 +146,7 @@ int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
             || st.st_rdev == console_st.st_rdev) {
             if (n == allocated) {
                 allocated = allocated ? 2 * allocated : 2;
-                tmp = realloc(fds, allocated * sizeof *tmp);
+                tmp = xreallocarray(fds, allocated, sizeof *tmp);
                 if (tmp == NULL) {
                   child->error = assert_nonzero(errno);
                   error("Unable to allocate memory for fd array.");
