@@ -788,7 +788,20 @@ int steal_block_hup(struct steal_pty_state *steal) {
 }
 
 int steal_cleanup_child(struct steal_pty_state *steal) {
-    do_syscall(&steal->child, close, steal->master_fd, 0, 0, 0, 0, 0);
+    if (ptrace_memcpy_to_child(&steal->child,
+                               steal->child_scratch,
+                               "/dev/null", sizeof("/dev/null"))) {
+        return steal->child.error;
+    }
+
+    int nullfd = do_syscall(&steal->child, open, steal->child_scratch, O_RDONLY, 0, 0, 0, 0);
+    if (nullfd < 0) {
+        return steal->child.error;
+    }
+
+    do_syscall(&steal->child, dup2, nullfd, steal->master_fd, 0, 0, 0, 0);
+    do_syscall(&steal->child, close, nullfd, 0, 0, 0, 0, 0);
+
     ptrace_restore_regs(&steal->child);
 
     ptrace_detach_child(&steal->child);
