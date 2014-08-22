@@ -236,6 +236,7 @@ int main(int argc, char **argv) {
             usage(argv[0]);
             return 1;
         }
+        if (opt == 'l' || opt == 'L') break; // the rest is a command line
     }
 
     if (do_attach && optind >= argc) {
