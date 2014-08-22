@@ -78,8 +78,10 @@ void error(const char *msg, ...) {
 
 void setup_raw(struct termios *save) {
     struct termios set;
-    if (tcgetattr(0, save) < 0)
-        die("Unable to read terminal attributes: %m");
+    if (tcgetattr(0, save) < 0) {
+        fprintf(stderr, "Unable to read terminal attributes: %m");
+        return;
+    }
     set = *save;
     cfmakeraw(&set);
     if (tcsetattr(0, TCSANOW, &set) < 0)
