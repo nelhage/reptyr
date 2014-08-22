@@ -88,8 +88,14 @@ void setup_raw(struct termios *save) {
 
 void resize_pty(int pty) {
     struct winsize sz;
-    if (ioctl(0, TIOCGWINSZ, &sz) < 0)
+    if (ioctl(0, TIOCGWINSZ, &sz) < 0) {
+        // provide fake size to workaround some problems
+        struct winsize defaultsize = {30,80,640,480};
+        if (ioctl(pty, TIOCSWINSZ, &defaultsize) < 0) {
+            fprintf(stderr, "Cannot set terminal size\n");
+        }
         return;
+    }
     ioctl(pty, TIOCSWINSZ, &sz);
 }
 
