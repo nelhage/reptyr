@@ -78,8 +78,10 @@ void error(const char *msg, ...) {
 
 void setup_raw(struct termios *save) {
     struct termios set;
-    if (tcgetattr(0, save) < 0)
-        die("Unable to read terminal attributes: %m");
+    if (tcgetattr(0, save) < 0) {
+        fprintf(stderr, "Unable to read terminal attributes: %m");
+        return;
+    }
     set = *save;
     cfmakeraw(&set);
     if (tcsetattr(0, TCSANOW, &set) < 0)
@@ -88,8 +90,14 @@ void setup_raw(struct termios *save) {
 
 void resize_pty(int pty) {
     struct winsize sz;
-    if (ioctl(0, TIOCGWINSZ, &sz) < 0)
+    if (ioctl(0, TIOCGWINSZ, &sz) < 0) {
+        // provide fake size to workaround some problems
+        struct winsize defaultsize = {30,80,640,480};
+        if (ioctl(pty, TIOCSWINSZ, &defaultsize) < 0) {
+            fprintf(stderr, "Cannot set terminal size\n");
+        }
         return;
+    }
     ioctl(pty, TIOCSWINSZ, &sz);
 }
 
@@ -228,6 +236,7 @@ int main(int argc, char **argv) {
             usage(argv[0]);
             return 1;
         }
+        if (opt == 'l' || opt == 'L') break; // the rest is a command line
     }
 
     if (do_attach && optind >= argc) {
