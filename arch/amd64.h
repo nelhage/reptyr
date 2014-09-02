@@ -80,7 +80,8 @@ struct syscall_numbers arch_syscall_numbers[2] = {
         .nr_open    = 5,
         .nr_close   = 6,
         .nr_ioctl   = 54,
-        .nr_dup2    = 63
+        .nr_dup2    = 63,
+        .nr_socketcall = 102,
     }
 };
 

@@ -27,9 +27,13 @@
     SC(close),
     SC(ioctl),
     SC(dup2),
+#ifdef __NR_socketcall
+    SC(socketcall),
+#else
     SC(socket),
     SC(connect),
     SC(sendmsg),
+#endif
 },
 
 #undef SC

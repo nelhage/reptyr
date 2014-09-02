@@ -40,6 +40,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <linux/major.h>
+#include <linux/net.h>
 
 #include "ptrace.h"
 #include "reptyr.h"
@@ -57,6 +58,23 @@ struct proc_stat {
 #define do_syscall(child, name, a0, a1, a2, a3, a4, a5) \
     ptrace_remote_syscall((child), ptrace_syscall_numbers((child))->nr_##name, \
                           a0, a1, a2, a3, a4, a5)
+
+// Define lowercased versions of the socketcall numbers, so that we
+// can assemble them with ## in the macro below
+#define socketcall_socket SYS_SOCKET
+#define socketcall_connect SYS_CONNECT
+#define socketcall_sendmsg SYS_SENDMSG
+
+#define do_socketcall(child, name, a0, a1, a2, a3, a4)                  \
+    ({                                                                  \
+        int __ret;                                                      \
+        if (ptrace_syscall_numbers((child))->nr_##name) {               \
+            __ret = do_syscall((child), name, a0, a1, a2, a3, a4, 0);   \
+        } else {                                                        \
+            __ret = do_syscall((child), socketcall, socketcall_##name,  \
+                               a0, a1, a2, a3, a4);                     \
+        }                                                               \
+        __ret; })
 
 #define assert_nonzero(expr) ({                         \
             typeof(expr) __val = expr;                  \
@@ -689,7 +707,7 @@ int find_master_fd(struct steal_pty_state *steal) {
 
 int setup_steal_socket_child(struct steal_pty_state *steal) {
     int err;
-    err = do_syscall(&steal->child, socket, AF_UNIX, SOCK_DGRAM, 0, 0, 0, 0);
+    err = do_socketcall(&steal->child, socket, AF_UNIX, SOCK_DGRAM, 0, 0, 0);
     if (err < 0)
         return -err;
     steal->child_fd = err;
@@ -698,8 +716,8 @@ int setup_steal_socket_child(struct steal_pty_state *steal) {
                                  &steal->addr_un, sizeof(steal->addr_un));
     if (err < 0)
         return steal->child.error;
-    err = do_syscall(&steal->child, connect, steal->child_fd, steal->child_scratch,
-                     sizeof(steal->addr_un),0,0,0);
+    err = do_socketcall(&steal->child, connect, steal->child_fd, steal->child_scratch,
+                     sizeof(steal->addr_un),0,0);
     if (err < 0)
         return -err;
     debug("Connected to the shared socket.");
@@ -734,10 +752,10 @@ int steal_child_pty(struct steal_pty_state *steal) {
     }
 
     steal->child.error = 0;
-    err = do_syscall(&steal->child, sendmsg,
+    err = do_socketcall(&steal->child, sendmsg,
                      steal->child_fd,
                      steal->child_scratch,
-                     MSG_DONTWAIT, 0,0,0);
+                     MSG_DONTWAIT, 0,0);
     if (err < 0) {
         return steal->child.error ? steal->child.error : -err;
     }
