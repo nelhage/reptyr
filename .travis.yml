@@ -1,1 +1,4 @@
 script: make
+env:
+  - CFLAGS=-m32 LDFLAGS=-m32
+  - CFLAGS=-m64 LDFLAGS=-m64
