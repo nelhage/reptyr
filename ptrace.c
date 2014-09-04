@@ -290,7 +290,7 @@ int ptrace_memcpy_from_child(struct ptrace_child *child, void *dst, child_addr_t
     unsigned long scratch;
 
     while (n) {
-         scratch = ptrace_command(child, PTRACE_PEEKDATA, src);
+        scratch = ptrace_command(child, PTRACE_PEEKDATA, src);
         if (child->error) return -1;
         memcpy(dst, &scratch, min(n, sizeof(unsigned long)));
 
