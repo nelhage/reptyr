@@ -34,9 +34,7 @@
 
 #include "reptyr.h"
 
-#ifndef __linux__
-#error reptyr is currently Linux-only.
-#endif
+#include "platform/platform.h"
 
 static int verbose = 0;
 
@@ -176,25 +174,6 @@ void usage(char *me) {
     fprintf(stderr, "  -V    Print verbose debug output.\n");
 }
 
-void check_yama_ptrace_scope(void) {
-    int fd = open("/proc/sys/kernel/yama/ptrace_scope", O_RDONLY);
-    if (fd >= 0) {
-        char buf[256];
-        int n;
-        n = read(fd, buf, sizeof buf);
-        close(fd);
-        if (n > 0) {
-            if (!atoi(buf)) {
-                return;
-            }
-        }
-    } else if (errno == ENOENT)
-        return;
-    fprintf(stderr, "The kernel denied permission while attaching. If your uid matches\n");
-    fprintf(stderr, "the target's, check the value of /proc/sys/kernel/yama/ptrace_scope.\n");
-    fprintf(stderr, "For more information, see /etc/sysctl.d/10-ptrace.conf\n");
-}
-
 int main(int argc, char **argv) {
     struct termios saved_termios;
     struct sigaction act;
@@ -246,8 +225,8 @@ int main(int argc, char **argv) {
     }
 
     if (!do_steal) {
-        if ((pty = open("/dev/ptmx", O_RDWR|O_NOCTTY)) < 0)
-            die("Unable to open /dev/ptmx: %m");
+        if ((pty = get_pt()) < 0)
+            die("Unable to allocate a new pseudo-terminal: %m");
         if (unlockpt(pty) < 0)
             die("Unable to unlockpt: %m");
         if (grantpt(pty) < 0)
@@ -275,7 +254,7 @@ int main(int argc, char **argv) {
         if (err) {
             fprintf(stderr, "Unable to attach to pid %d: %s\n", child, strerror(err));
             if (err == EPERM) {
-                check_yama_ptrace_scope();
+                check_ptrace_scope();
             }
             return 1;
         }
