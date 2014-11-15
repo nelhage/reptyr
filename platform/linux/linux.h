@@ -4,6 +4,29 @@
 #ifdef __linux__
 #include <linux/major.h>
 #include <linux/net.h>
+#include <linux/limits.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <sys/ptrace.h>
+#include <asm/ptrace.h>
+#include <sys/types.h>
+#include <sys/user.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <sys/syscall.h>
+#include <sys/mman.h>
+#include <assert.h>
+#include <stddef.h>
+#include <termios.h>
+#include <fcntl.h>
+#include <dirent.h>
+#include <sys/ioctl.h>
+#include <sys/stat.h>
+
 
 #define socketcall_socket SYS_SOCKET
 #define socketcall_connect SYS_CONNECT

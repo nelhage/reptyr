@@ -19,22 +19,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <sys/ptrace.h>
-#include <asm/ptrace.h>
-#include <sys/types.h>
-#include <sys/user.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/syscall.h>
-#include <sys/mman.h>
-#include <assert.h>
-#include <stddef.h>
-
-#include "ptrace.h"
+#include "../../ptrace.h"
+#include "../platform.h"
 
 /*
  * RHEL 5's kernel supports these flags, but their libc doesn't ship a ptrace.h

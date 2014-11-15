@@ -2,6 +2,9 @@
 
 #include "linux.h"
 #include "../platform.h"
+#include "../../reptyr.h"
+#include "../../reallocarray.h"
+#include "../../ptrace.h"
 
 int parse_proc_stat(int statfd, struct proc_stat *out) {
     char buf[1024];
@@ -280,8 +283,10 @@ int get_pt(){
 }
 
 int get_process_tty_termios(pid_t pid, struct termios *tio){
-    int i;
 	int err=EINVAL;
+    char buf[PATH_MAX];
+    int i;
+	int fd;
 
     for (i = 0; i < 3 && err; i++) {
         err = 0;

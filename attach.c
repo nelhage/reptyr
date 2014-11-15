@@ -152,10 +152,8 @@ void wait_for_stop(pid_t pid, int fd) {
 }
 
 int copy_tty_state(pid_t pid, const char *pty) {
-    //char buf[PATH_MAX];
     int fd, err = EINVAL;
     struct termios tio;
-    //int i;
 
 	err=get_process_tty_termios(pid,&tio);
 
