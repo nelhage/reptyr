@@ -19,6 +19,8 @@ int check_pgroup(pid_t target) {
 
 	procstat=procstat_open_sysctl();
 	kp=procstat_getprocs(procstat,KERN_PROC_PGRP,pg,&cnt);
+	procstat_freeprocs(procstat,kp);
+	procstat_close(procstat);
 
 	if(cnt>1){
 		error("Process %d shares a process group with %d other processes. Unable to attach.\n",target,cnt-1);
@@ -37,10 +39,15 @@ int check_proc_stopped(pid_t pid, int fd){
 	procstat=procstat_open_sysctl();
 	kp=procstat_getprocs(procstat,KERN_PROC_PID,pid,&cnt);
 
+	if(cnt>0)
+		state = kp->ki_stat;
+
+	procstat_freeprocs(procstat,kp);
+	procstat_close(procstat);
+
 	if(cnt<1)
 		return 1;
 
-	state = kp->ki_stat;
 
 	if(state==SSTOP)
 		return 1;
@@ -109,7 +116,11 @@ int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
 	}
 
  out:
+	procstat_freefiles(procstat,head);
+	procstat_freeprocs(procstat,kp);
+	procstat_close(procstat);
     *count = n;
+	debug("Found %d tty fds in child %d.",n,child->pid);
 	return fds;
 }
 
@@ -126,10 +137,12 @@ int find_terminal_emulator(struct steal_pty_state *steal) {
 
 	procstat=procstat_open_sysctl();
 	kp=procstat_getprocs(procstat,KERN_PROC_PID,steal->target_stat.sid,&cnt);
-	if(kp==NULL || cnt<1)
-		return 0;
 
-    steal->emulator_pid = kp->ki_ppid;
+	if(kp && cnt>0)
+		steal->emulator_pid = kp->ki_ppid;
+
+	procstat_freeprocs(procstat,kp);
+	procstat_close(procstat);
 
     return 0;
 }
@@ -138,24 +151,28 @@ int get_terminal_state(struct steal_pty_state *steal, pid_t target) {
 	struct procstat *procstat;
 	struct kinfo_proc *kp;
 	unsigned int cnt;
-	int err;
+	int err=0;
 
 	//kp = kvm_getprocs(kd,KERN_PROC_PID,child->pid,&cnt);
 
 	procstat=procstat_open_sysctl();
 	kp=procstat_getprocs(procstat,KERN_PROC_PID,target,&cnt);
 	if(kp==NULL || cnt<1)
-		return 0;
+		goto done;
 
 	if(kp->ki_tdev==NODEV){
         error("Child is not connected to a pseudo-TTY. Unable to steal TTY.");
-        return EINVAL;
+		err=EINVAL;
+		goto done;
 	}
 
     if ((err = find_terminal_emulator(steal)))
         return err;
 
-	return 0;
+done:
+	procstat_freeprocs(procstat,kp);
+	procstat_close(procstat);
+	return err;
 }
 
 int find_master_fd(struct steal_pty_state *steal) {
@@ -196,6 +213,9 @@ int get_process_tty_termios(pid_t pid, struct termios *tio){
 		}
 	}
 
+	procstat_freefiles(procstat,head);
+	procstat_freeprocs(procstat,kp);
+	procstat_close(procstat);
 	return err;
 }
 
@@ -210,11 +230,13 @@ void move_process_group(struct ptrace_child *child, pid_t from, pid_t to) {
 	kp=procstat_getprocs(procstat,KERN_PROC_PGRP,from,&cnt);
 
 	for(i=0;i<cnt;i++){
-		debug("Change pgid for pid %d", kp[i].ki_pid);
+		debug("Change pgid for pid %d to %d", kp[i].ki_pid,to);
 		err = do_syscall(child, setpgid, kp[i].ki_pid, to, 0, 0, 0, 0);
 		if (err < 0)
 			error(" failed: %s", strerror(-err));
 	}
+	procstat_freeprocs(procstat,kp);
+	procstat_close(procstat);
 }
 
 void copy_user(struct ptrace_child *d, struct ptrace_child *s){

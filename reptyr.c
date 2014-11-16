@@ -124,6 +124,7 @@ void do_proxy(int pty) {
     char buf[4096];
     ssize_t count;
     fd_set set;
+	struct timeval timeout;
     while (1) {
         if (winch_happened) {
             winch_happened = 0;
@@ -137,7 +138,9 @@ void do_proxy(int pty) {
         FD_ZERO(&set);
         FD_SET(0, &set);
         FD_SET(pty, &set);
-        if (select(pty+1, &set, NULL, NULL, NULL) < 0) {
+		timeout.tv_sec=0;
+		timeout.tv_usec=1000;
+        if (select(pty+1, &set, NULL, NULL, &timeout) < 0) {
             if (errno == EINTR)
                 continue;
             fprintf(stderr, "select: %m");
@@ -151,7 +154,7 @@ void do_proxy(int pty) {
         }
         if (FD_ISSET(pty, &set)) {
             count = read(pty, buf, sizeof buf);
-            if (count < 0)
+            if (count <= 0)
                 return;
             writeall(1, buf, count);
         }

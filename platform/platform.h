@@ -32,7 +32,7 @@ struct steal_pty_state {
     int sockfd;
 
     struct ptrace_child child;
-    unsigned long child_scratch;
+    child_addr_t child_scratch;
     int child_fd;
 
     int ptyfd;

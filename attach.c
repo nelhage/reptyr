@@ -46,9 +46,9 @@
 #include "platform/platform.h"
 
 static void do_unmap(struct ptrace_child *child, child_addr_t addr, unsigned long len) {
-    if (addr == (unsigned long)-1)
+    if (addr == (child_addr_t)-1)
         return;
-    do_syscall(child, munmap, addr, len, 0, 0, 0, 0);
+    do_syscall(child, munmap, (unsigned long)addr, len, 0, 0, 0, 0);
 }
 
 int do_setsid(struct ptrace_child *child) {
@@ -92,12 +92,12 @@ int do_setsid(struct ptrace_child *child) {
  out_kill:
     kill(dummy.pid, SIGKILL);
     ptrace_detach_child(&dummy);
-    ptrace_wait(&dummy);
+    //ptrace_wait(&dummy);
     do_syscall(child, wait4, dummy.pid, 0, WNOHANG, 0, 0, 0);
     return err;
 }
 
-int ignore_hup(struct ptrace_child *child, unsigned long scratch_page) {
+int ignore_hup(struct ptrace_child *child, child_addr_t scratch_page) {
     int err;
     if (ptrace_syscall_numbers(child)->nr_signal != -1) {
         err = do_syscall(child, signal, SIGHUP, (unsigned long)SIG_IGN, 0, 0, 0, 0);
@@ -110,8 +110,9 @@ int ignore_hup(struct ptrace_child *child, unsigned long scratch_page) {
         if (err < 0)
             return err;
         err = do_syscall(child, rt_sigaction,
-                         SIGHUP, scratch_page,
-                         0, 8, 0, 0);
+                         SIGHUP, (unsigned long)scratch_page,
+                         0, 0, 0, 0);
+                         //0, 8, 0, 0);
     }
     return err;
 }
@@ -169,16 +170,17 @@ int copy_tty_state(pid_t pid, const char *pty) {
     return -err;
 }
 
-int mmap_scratch(struct ptrace_child *child, unsigned long *addr) {
+int mmap_scratch(struct ptrace_child *child, child_addr_t *addr) {
     long mmap_syscall;
-    unsigned long scratch_page;
+    child_addr_t scratch_page;
 
     mmap_syscall = ptrace_syscall_numbers(child)->nr_mmap2;
     if (mmap_syscall == -1)
         mmap_syscall = ptrace_syscall_numbers(child)->nr_mmap;
     scratch_page = ptrace_remote_syscall(child, mmap_syscall, 0,
                                          sysconf(_SC_PAGE_SIZE), PROT_READ|PROT_WRITE,
-                                         MAP_ANONYMOUS|MAP_PRIVATE, 0, 0);
+                                         MAP_ANONYMOUS|MAP_SHARED, -1, 0);
+                                         //MAP_ANONYMOUS|MAP_PRIVATE, -1, 0);
 
     if (scratch_page > (unsigned long)-1000) {
         return -(signed long)scratch_page;
@@ -190,7 +192,7 @@ int mmap_scratch(struct ptrace_child *child, unsigned long *addr) {
     return 0;
 }
 
-int grab_pid(pid_t pid, struct ptrace_child *child, unsigned long *scratch) {
+int grab_pid(pid_t pid, struct ptrace_child *child, child_addr_t *scratch) {
     int err;
 
     if (ptrace_attach_child(child, pid)) {
@@ -222,7 +224,7 @@ int grab_pid(pid_t pid, struct ptrace_child *child, unsigned long *scratch) {
 
 int attach_child(pid_t pid, const char *pty, int force_stdio) {
     struct ptrace_child child;
-    unsigned long scratch_page = -1;
+    child_addr_t scratch_page = -1;
     int *child_tty_fds = NULL, n_fds, child_fd, statfd=-1;;
     int i;
     int err = 0;
@@ -234,6 +236,8 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
     if ((err = check_pgroup(pid))) {
         return err;
     }
+
+	debug("Using tty: %s",pty);
 
     if ((err = copy_tty_state(pid, pty))) {
         if (err == ENOTTY && !force_stdio) {
@@ -308,16 +312,19 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
     if (err < 0)
         goto out_close;
 
-    err = do_syscall(&child, ioctl, child_fd, TIOCSCTTY, 0, 0, 0, 0);
-    if (err < 0) {
-        error("Unable to set controlling terminal.");
+    err = do_syscall(&child, ioctl, child_fd, TIOCSCTTY, 1, 0, 0, 0);
+    if (err != 0) { /* Seems to be returning >0 for error */
+        error("Unable to set controlling terminal: %s",strerror(err));
         goto out_close;
     }
 
     debug("Set the controlling tty");
 
-    for (i = 0; i < n_fds; i++)
-        do_syscall(&child, dup2, child_fd, child_tty_fds[i], 0, 0, 0, 0);
+    for (i = 0; i < n_fds; i++){
+        err = do_syscall(&child, dup2, child_fd, child_tty_fds[i], 0, 0, 0, 0);
+		if(err<0)
+			error("Problem moving child fd number %d to new tty: %s",child_tty_fds[i],strerror(errno));
+	}
 
 
     err = 0;
@@ -451,7 +458,7 @@ int steal_child_pty(struct steal_pty_state *steal) {
 // it doesn't die.
 int steal_block_hup(struct steal_pty_state *steal) {
     struct ptrace_child leader;
-    unsigned long scratch;
+    child_addr_t scratch;
     int err = 0;
 
     if ((err = grab_pid(steal->target_stat.sid, &leader, &scratch)))
