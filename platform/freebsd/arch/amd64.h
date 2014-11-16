@@ -60,29 +60,15 @@ struct x86_personality x86_personality[2] = {
 struct syscall_numbers arch_syscall_numbers[2] = {
 #include "default-syscalls.h"
     {
-        /*
-         * These don't seem to be available in any convenient header. We could
-         * include unistd_32.h, but those definitions would conflict with the
-         * standard ones. So, let's just hardcode the values for now. Probably
-         * we should generate this from unistd_32.h during the build process or
-         * soemthing.
-         */
-        //.nr_signal  = 48,
-        //.nr_socketcall = 102,
     }
 };
 
 int arch_get_personality(struct ptrace_child *child) {
     unsigned long cs;
 
-    //cs = ptrace_command(child, PT_READ_D,
-                        //offsetof(struct reg, r_cs));
-	//ret = ptrace_command(child, PT_GETREGS, &regs);
-	//TTME
 	cs = arch_get_register(child,offsetof(struct reg, r_cs));
     if (child->error)
         return -1;
-	//cs = regs.r_cs;
     if (cs == 0x23)
         child->personality = 1;
     return 0;

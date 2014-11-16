@@ -19,6 +19,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+
 #include <sys/ptrace.h>
 #include <sys/types.h>
 #include <sys/user.h>
@@ -37,23 +38,6 @@
 #include "../../ptrace.h"
 
 #include "../platform.h"
-
-/*
- * RHEL 5's kernel supports these flags, but their libc doesn't ship a ptrace.h
- * that defines them. Define them here, and if our kernel doesn't support them,
- * we'll find out when PTRACE_SETOPTIONS fails.
- */
-#ifndef PTRACE_O_TRACESYSGOOD
-#define PTRACE_O_TRACESYSGOOD 0x00000001
-#endif
-
-#ifndef PTRACE_O_TRACEFORK
-#define PTRACE_O_TRACEFORK 0x00000002
-#endif
-
-#ifndef PTRACE_EVENT_FORK
-#define PTRACE_EVENT_FORK 1
-#endif
 
 #define min(x, y) ({				\
 	typeof(x) _min1 = (x);			\
@@ -166,14 +150,6 @@ int ptrace_wait(struct ptrace_child *child) {
 			child->state=ptrace_at_syscall;
 		if(lwpinfo.pl_flags & PL_FLAG_SCX)
 			child->state=ptrace_after_syscall;
-	/*}
-	else {
-            if (lwpinfo.pl_flags==PL_FLAG_FORKED )//(((child->status >> 8) & PTRACE_EVENT_FORK) == PTRACE_EVENT_FORK))
-				child->forked_pid=lwpinfo.pl_child_pid;
-                //ptrace_command(child, PTRACE_GETEVENTMSG, 0, &child->forked_pid);
-            if (child->state != ptrace_at_syscall)
-                child->state = ptrace_stopped;
-        }*/
     } else {
         child->error = EINVAL;
         return -1;
@@ -191,7 +167,6 @@ int ptrace_advance_to_state(struct ptrace_child *child,
                 child->error = EAGAIN;
                 return -1;
             }
-            //err = ptrace_command(child, PT_SYSCALL, (caddr_t)1, 0);
             err = ptrace_command(child, PT_TO_SCX, (caddr_t)1, 0);
             break;
         case ptrace_at_syscall:
@@ -199,7 +174,6 @@ int ptrace_advance_to_state(struct ptrace_child *child,
                 child->error = EAGAIN;
                 return -1;
             }
-            //err = ptrace_command(child, PT_SYSCALL, (caddr_t)1, 0);
             err = ptrace_command(child, PT_TO_SCE, (caddr_t)1, 0);
             break;
         case ptrace_running:
@@ -252,15 +226,6 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
         return -1;
 #define setreg(r, v) arch_set_register(child,personality(child)->r,v)
 
-/*
-#define setreg(r, v) do {                                               \
-        if (ptrace_command(child, PT_WRITE_D,                      \
-                           personality(child)->r,                       \
-                           (v)) < 0)                                    \
-            return -1;                                                  \
-    } while (0)
-*/
-
     //if (arch_set_syscall(child, sysno) < 0)
         //return -1;
 
@@ -276,9 +241,6 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
     if (ptrace_advance_to_state(child, ptrace_after_syscall) < 0)
         return -1;
 
-    //rv = ptrace_command(child, PT_READ_D,
-                        //personality(child)->syscall_rv);
-	//TTME
 	rv = arch_get_register(child,personality(child)->syscall_rv);
     if (child->error)
         return -1;

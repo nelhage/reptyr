@@ -1,3 +1,25 @@
+/*
+ * Copyright (C) 2014 Christian Heckendorf <heckendorfc@gmail.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
 #ifdef __FreeBSD__
 
 #include "freebsd.h"
@@ -78,17 +100,8 @@ int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
 	int er;
 	char errbuf[_POSIX2_LINE_MAX];
 
-	//kp = kvm_getprocs(kd,KERN_PROC_PID,child->pid,&cnt);
-
 	head=get_procfiles(child->pid,&kp,&procstat,&cnt);
-/*
-	procstat_open_sysctl();
-	kp=procstat_getprocs(procstat,KERN_PROC_PID,child->pid,&cnt);
-	if(kp==NULL || cnt<1)
-		return NULL;
 
-	head=procstat_getfiles(procstat,kp,mflg);
-*/
 	STAILQ_FOREACH(fst,head,next){
 		if(fst->fs_type==PS_FST_TYPE_VNODE){
 			er = procstat_get_vnode_info(procstat, fst, &vn, errbuf);
@@ -152,8 +165,6 @@ int get_terminal_state(struct steal_pty_state *steal, pid_t target) {
 	struct kinfo_proc *kp;
 	unsigned int cnt;
 	int err=0;
-
-	//kp = kvm_getprocs(kd,KERN_PROC_PID,child->pid,&cnt);
 
 	procstat=procstat_open_sysctl();
 	kp=procstat_getprocs(procstat,KERN_PROC_PID,target,&cnt);

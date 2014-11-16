@@ -19,6 +19,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+
+#error ARM not yet supported for FreeBSD
+
 static struct ptrace_personality arch_personality[1] = {
     {
         offsetof(struct user, regs.uregs[0]),

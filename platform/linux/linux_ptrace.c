@@ -19,6 +19,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+
+#ifdef __linux__
+
 #include "../../ptrace.h"
 #include "../platform.h"
 
@@ -324,4 +327,6 @@ int main(int argc, char **argv) {
 
     return 0;
 }
+#endif
+
 #endif
