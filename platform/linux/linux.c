@@ -146,21 +146,21 @@ int check_pgroup(pid_t target) {
             goto out;
         }
     }
- out:
+out:
     closedir(dir);
     return err;
 }
 
-int check_proc_stopped(pid_t pid, int fd){
+int check_proc_stopped(pid_t pid, int fd) {
     struct proc_stat st;
 
-	if (parse_proc_stat(fd, &st))
-		return 1;
+    if (parse_proc_stat(fd, &st))
+        return 1;
 
-	if (st.state == 'T')
-		return 1;
+    if (st.state == 'T')
+        return 1;
 
-	return 0;
+    return 0;
 }
 
 int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
@@ -201,17 +201,17 @@ int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
             continue;
 
         if (st.st_rdev == child_status.ctty
-            || st.st_rdev == tty_st.st_rdev
-            || st.st_rdev == console_st.st_rdev) {
+                || st.st_rdev == tty_st.st_rdev
+                || st.st_rdev == console_st.st_rdev) {
             if (n == allocated) {
                 allocated = allocated ? 2 * allocated : 2;
-                tmp = xreallocarray(fds, allocated, sizeof *tmp);
+                tmp = xreallocarray(fds, allocated, sizeof(*tmp));
                 if (tmp == NULL) {
-                  child->error = assert_nonzero(errno);
-                  error("Unable to allocate memory for fd array.");
-                  free(fds);
-                  fds = NULL;
-                  goto out;
+                    child->error = assert_nonzero(errno);
+                    error("Unable to allocate memory for fd array.");
+                    free(fds);
+                    fds = NULL;
+                    goto out;
                 }
                 fds = tmp;
             }
@@ -219,7 +219,7 @@ int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
             fds[n++] = atoi(d->d_name);
         }
     }
- out:
+out:
     *count = n;
     closedir(dir);
     return fds;
@@ -300,15 +300,15 @@ int find_master_fd(struct steal_pty_state *steal) {
 }
 
 /* Homebrew posix_openpt() */
-int get_pt(){
-	return open("/dev/ptmx", O_RDWR|O_NOCTTY);
+int get_pt() {
+    return open("/dev/ptmx", O_RDWR | O_NOCTTY);
 }
 
-int get_process_tty_termios(pid_t pid, struct termios *tio){
-	int err=EINVAL;
+int get_process_tty_termios(pid_t pid, struct termios *tio) {
+    int err = EINVAL;
     char buf[PATH_MAX];
     int i;
-	int fd;
+    int fd;
 
     for (i = 0; i < 3 && err; i++) {
         err = 0;
@@ -327,11 +327,11 @@ int get_process_tty_termios(pid_t pid, struct termios *tio){
         if (tcgetattr(fd, tio) < 0) {
             err = -assert_nonzero(errno);
         }
-    retry:
+retry:
         close(fd);
     }
 
-	return err;
+    return err;
 }
 
 void move_process_group(struct ptrace_child *child, pid_t from, pid_t to) {
@@ -358,8 +358,8 @@ void move_process_group(struct ptrace_child *child, pid_t from, pid_t to) {
     closedir(dir);
 }
 
-void copy_user(struct ptrace_child *d, struct ptrace_child *s){
-	memcpy(&d->user,&s->user,sizeof(s->user));
+void copy_user(struct ptrace_child *d, struct ptrace_child *s) {
+    memcpy(&d->user, &s->user, sizeof(s->user));
 }
 
 #endif

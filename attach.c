@@ -46,7 +46,7 @@
 #include "platform/platform.h"
 
 static void do_unmap(struct ptrace_child *child, child_addr_t addr, unsigned long len) {
-    if (addr == (child_addr_t)-1)
+    if (addr == (child_addr_t) - 1)
         return;
     do_syscall(child, munmap, (unsigned long)addr, len, 0, 0, 0, 0);
 }
@@ -89,7 +89,7 @@ int do_setsid(struct ptrace_child *child) {
 
     debug("Did setsid()");
 
- out_kill:
+out_kill:
     kill(dummy.pid, SIGKILL);
     ptrace_detach_child(&dummy);
     //ptrace_wait(&dummy);
@@ -134,7 +134,7 @@ void wait_for_stop(pid_t pid, int fd) {
     while (1) {
         gettimeofday(&now, NULL);
         if ((now.tv_sec > start.tv_sec && now.tv_usec > start.tv_usec)
-            || (now.tv_sec - start.tv_sec > 1)) {
+                || (now.tv_sec - start.tv_sec > 1)) {
             error("Timed out waiting for child stop.");
             break;
         }
@@ -142,8 +142,8 @@ void wait_for_stop(pid_t pid, int fd) {
          * If anything goes wrong reading or parsing the stat node, just give
          * up.
          */
-		if(check_proc_stopped(pid,fd))
-			break;
+        if (check_proc_stopped(pid, fd))
+            break;
 
         sleep.tv_sec  = 0;
         sleep.tv_nsec = 10000000;
@@ -155,7 +155,7 @@ int copy_tty_state(pid_t pid, const char *pty) {
     int fd, err = EINVAL;
     struct termios tio;
 
-	err=get_process_tty_termios(pid,&tio);
+    err = get_process_tty_termios(pid, &tio);
 
     if (err)
         return err;
@@ -177,11 +177,11 @@ int mmap_scratch(struct ptrace_child *child, child_addr_t *addr) {
     if (mmap_syscall == -1)
         mmap_syscall = ptrace_syscall_numbers(child)->nr_mmap;
     scratch_page = ptrace_remote_syscall(child, mmap_syscall, 0,
-                                         sysconf(_SC_PAGE_SIZE), PROT_READ|PROT_WRITE,
-                                         MAP_ANONYMOUS|MAP_SHARED, -1, 0);
-                                         //MAP_ANONYMOUS|MAP_PRIVATE, -1, 0);
+                                         sysconf(_SC_PAGE_SIZE), PROT_READ | PROT_WRITE,
+                                         MAP_ANONYMOUS | MAP_SHARED, -1, 0);
+    //MAP_ANONYMOUS|MAP_PRIVATE, -1, 0);
 
-    if (scratch_page > (unsigned long)-1000) {
+    if (scratch_page > (unsigned long) - 1000) {
         return -(signed long)scratch_page;
     }
 
@@ -212,10 +212,10 @@ int grab_pid(pid_t pid, struct ptrace_child *child, child_addr_t *scratch) {
 
     return 0;
 
- out_restore_regs:
+out_restore_regs:
     ptrace_restore_regs(child);
 
- out:
+out:
     ptrace_detach_child(child);
 
     return err;
@@ -224,7 +224,7 @@ int grab_pid(pid_t pid, struct ptrace_child *child, child_addr_t *scratch) {
 int attach_child(pid_t pid, const char *pty, int force_stdio) {
     struct ptrace_child child;
     child_addr_t scratch_page = -1;
-    int *child_tty_fds = NULL, n_fds, child_fd, statfd=-1;;
+    int *child_tty_fds = NULL, n_fds, child_fd, statfd = -1;
     int i;
     int err = 0;
     long page_size = sysconf(_SC_PAGE_SIZE);
@@ -236,7 +236,7 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
         return err;
     }
 
-	debug("Using tty: %s",pty);
+    debug("Using tty: %s", pty);
 
     if ((err = copy_tty_state(pid, pty))) {
         if (err == ENOTTY && !force_stdio) {
@@ -280,14 +280,14 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
         }
     }
 
-    if (ptrace_memcpy_to_child(&child, scratch_page, pty, strlen(pty)+1)) {
+    if (ptrace_memcpy_to_child(&child, scratch_page, pty, strlen(pty) + 1)) {
         err = child.error;
         error("Unable to memcpy the pty path to child.");
         goto out_free_fds;
     }
 
     child_fd = do_syscall(&child, open,
-                          scratch_page, O_RDWR|O_NOCTTY,
+                          scratch_page, O_RDWR | O_NOCTTY,
                           0, 0, 0, 0);
     if (child_fd < 0) {
         err = child_fd;
@@ -313,27 +313,27 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
 
     err = do_syscall(&child, ioctl, child_fd, TIOCSCTTY, 1, 0, 0, 0);
     if (err != 0) { /* Seems to be returning >0 for error */
-        error("Unable to set controlling terminal: %s",strerror(err));
+        error("Unable to set controlling terminal: %s", strerror(err));
         goto out_close;
     }
 
     debug("Set the controlling tty");
 
-    for (i = 0; i < n_fds; i++){
+    for (i = 0; i < n_fds; i++) {
         err = do_syscall(&child, dup2, child_fd, child_tty_fds[i], 0, 0, 0, 0);
-		if(err<0)
-			error("Problem moving child fd number %d to new tty: %s",child_tty_fds[i],strerror(errno));
-	}
+        if (err < 0)
+            error("Problem moving child fd number %d to new tty: %s", child_tty_fds[i], strerror(errno));
+    }
 
 
     err = 0;
 
- out_close:
+out_close:
     do_syscall(&child, close, child_fd, 0, 0, 0, 0, 0);
- out_free_fds:
+out_free_fds:
     free(child_tty_fds);
 
- out_unmap:
+out_unmap:
     do_unmap(&child, scratch_page, page_size);
 
     ptrace_restore_regs(&child);
@@ -344,7 +344,7 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
         wait_for_stop(child.pid, statfd);
     }
     kill(child.pid, SIGWINCH);
- out_cont:
+out_cont:
     kill(child.pid, SIGCONT);
 #ifdef __linux__
     close(statfd);
@@ -383,7 +383,7 @@ int setup_steal_socket_child(struct steal_pty_state *steal) {
     if (err < 0)
         return steal->child.error;
     err = do_socketcall(&steal->child, connect, steal->child_fd, steal->child_scratch,
-                     sizeof(steal->addr_un),0,0);
+                        sizeof(steal->addr_un), 0, 0);
     if (err < 0)
         return -err;
     debug("Connected to the shared socket.");
@@ -419,9 +419,9 @@ int steal_child_pty(struct steal_pty_state *steal) {
 
     steal->child.error = 0;
     err = do_socketcall(&steal->child, sendmsg,
-                     steal->child_fd,
-                     steal->child_scratch,
-                     MSG_DONTWAIT, 0,0);
+                        steal->child_fd,
+                        steal->child_scratch,
+                        MSG_DONTWAIT, 0, 0);
     if (err < 0) {
         return steal->child.error ? steal->child.error : -err;
     }

@@ -90,7 +90,7 @@ void resize_pty(int pty) {
     struct winsize sz;
     if (ioctl(0, TIOCGWINSZ, &sz) < 0) {
         // provide fake size to workaround some problems
-        struct winsize defaultsize = {30,80,640,480};
+        struct winsize defaultsize = {30, 80, 640, 480};
         if (ioctl(pty, TIOCSWINSZ, &defaultsize) < 0) {
             fprintf(stderr, "Cannot set terminal size\n");
         }
@@ -124,7 +124,7 @@ void do_proxy(int pty) {
     char buf[4096];
     ssize_t count;
     fd_set set;
-	struct timeval timeout;
+    struct timeval timeout;
     while (1) {
         if (winch_happened) {
             winch_happened = 0;
@@ -138,9 +138,9 @@ void do_proxy(int pty) {
         FD_ZERO(&set);
         FD_SET(0, &set);
         FD_SET(pty, &set);
-		timeout.tv_sec=0;
-		timeout.tv_usec=1000;
-        if (select(pty+1, &set, NULL, NULL, &timeout) < 0) {
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 1000;
+        if (select(pty + 1, &set, NULL, NULL, &timeout) < 0) {
             if (errno == EINTR)
                 continue;
             fprintf(stderr, "select: %m");
@@ -189,7 +189,7 @@ int main(int argc, char **argv) {
     int unattached_script_redirection = 0;
 
     while ((opt = getopt(argc, argv, "hlLsTvV")) != -1) {
-        switch(opt) {
+        switch (opt) {
         case 'h':
             usage(argv[0]);
             return 0;
@@ -265,17 +265,22 @@ int main(int argc, char **argv) {
         printf("Opened a new pty: %s\n", ptsname(pty));
         fflush(stdout);
         if (argc > 2) {
-            if(!fork()) {
+            if (!fork()) {
                 setenv("REPTYR_PTY", ptsname(pty), 1);
                 if (unattached_script_redirection) {
                     int f;
                     setpgid(0, getppid());
                     setsid();
-                    f = open(ptsname(pty), O_RDONLY, 0); dup2(f, 0);            close(f);
-                    f = open(ptsname(pty), O_WRONLY, 0); dup2(f, 1); dup2(f,2); close(f);
+                    f = open(ptsname(pty), O_RDONLY, 0);
+                    dup2(f, 0);
+                    close(f);
+                    f = open(ptsname(pty), O_WRONLY, 0);
+                    dup2(f, 1);
+                    dup2(f, 2);
+                    close(f);
                 }
                 close(pty);
-                execvp(argv[2], argv+2);
+                execvp(argv[2], argv + 2);
                 exit(1);
             }
         }
