@@ -111,8 +111,7 @@ int ignore_hup(struct ptrace_child *child, child_addr_t scratch_page) {
             return err;
         err = do_syscall(child, rt_sigaction,
                          SIGHUP, (unsigned long)scratch_page,
-                         0, 0, 0, 0);
-                         //0, 8, 0, 0);
+                         0, 8, 0, 0);
     }
     return err;
 }
