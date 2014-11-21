@@ -592,7 +592,7 @@ struct steal_pty_state {
     struct proc_stat target_stat;
 
     pid_t emulator_pid;
-    int master_fd;
+    struct fd_array master_fds;
 
     char tmpdir[PATH_MAX];
     union {
@@ -668,9 +668,9 @@ int setup_steal_socket(struct steal_pty_state *steal) {
 // using here.
 #define PTMX_DEVICE (makedev(5, 2))
 
-// Find the fd in the terminal emulator process that corresponds to
+// Find the fd(s) in the terminal emulator process that corresponds to
 // the master side of the target's pty. Store the result in
-// steal->master_fd.
+// steal->master_fds.
 int find_master_fd(struct steal_pty_state *steal) {
     DIR *dir;
     struct dirent *d;
@@ -710,13 +710,18 @@ int find_master_fd(struct steal_pty_state *steal) {
             continue;
         }
         if (ptn == (int)minor(steal->target_stat.ctty)) {
-            debug("found the master fd: %d", atoi(d->d_name));
-            steal->master_fd = atoi(d->d_name);
-            return 0;
+            debug("found a master fd: %d", atoi(d->d_name));
+            if (fd_array_push(&steal->master_fds, atoi(d->d_name)) != 0) {
+                error("unable to allocate memory for fd array!");
+                return ENOMEM;
+            }
         }
     }
 
-    return ESRCH;
+    if (steal->master_fds.n == 0) {
+        return ESRCH;
+    }
+    return 0;
 }
 
 int setup_steal_socket_child(struct steal_pty_state *steal) {
@@ -752,7 +757,7 @@ int steal_child_pty(struct steal_pty_state *steal) {
     cm->cmsg_level = SOL_SOCKET;
     cm->cmsg_type  = SCM_RIGHTS;
     cm->cmsg_len   = CMSG_LEN(sizeof(int));
-    memcpy(CMSG_DATA(cm), &steal->master_fd, sizeof(int));
+    memcpy(CMSG_DATA(cm), &steal->master_fds.fds[0], sizeof(int));
     buf.msg.msg_controllen = cm->cmsg_len;
 
     // Relocate for the child
@@ -831,8 +836,15 @@ int steal_cleanup_child(struct steal_pty_state *steal) {
         return steal->child.error;
     }
 
-    do_syscall(&steal->child, dup2, nullfd, steal->master_fd, 0, 0, 0, 0);
+    int i;
+    for (i = 0; i < steal->master_fds.n; ++i) {
+        do_syscall(&steal->child, dup2, nullfd, steal->master_fds.fds[i], 0, 0, 0, 0);
+    }
+
     do_syscall(&steal->child, close, nullfd, 0, 0, 0, 0, 0);
+    do_syscall(&steal->child, close, steal->child_fd, 0, 0, 0, 0, 0);
+
+    steal->child_fd = 0;
 
     ptrace_restore_regs(&steal->child);
 
@@ -909,6 +921,8 @@ out_no_child:
 
     if (steal.ptyfd)
         *pty = steal.ptyfd;
+
+    free(steal.master_fds.fds);
 
     return err;
 }
