@@ -46,6 +46,37 @@
 #include "reptyr.h"
 #include "reallocarray.h"
 
+#define assert_nonzero(expr) ({                         \
+            typeof(expr) __val = expr;                  \
+            if (__val == 0)                             \
+                die("Unexpected: %s == 0!\n", #expr);   \
+            __val;                                      \
+        })
+
+struct fd_array {
+    int *fds;
+    int n;
+    int allocated;
+};
+
+int fd_array_push(struct fd_array *fda, int fd) {
+    int *tmp;
+
+    if (fda->n == fda->allocated) {
+        fda->allocated = fda->allocated ? 2 * fda->allocated : 2;
+        tmp = xreallocarray(fda->fds, fda->allocated, sizeof *tmp);
+        if (tmp == NULL) {
+            free(fda->fds);
+            fda->fds = NULL;
+            fda->allocated = 0;
+            return -1;
+        }
+        fda->fds = tmp;
+    }
+    fda->fds[fda->n++] = fd;
+    return 0;
+}
+
 #define TASK_COMM_LENGTH 16
 struct proc_stat {
     pid_t pid;
@@ -75,13 +106,6 @@ struct proc_stat {
                                a0, a1, a2, a3, a4);                     \
         }                                                               \
         __ret; })
-
-#define assert_nonzero(expr) ({                         \
-            typeof(expr) __val = expr;                  \
-            if (__val == 0)                             \
-                die("Unexpected: %s == 0!\n", #expr);   \
-            __val;                                      \
-        })
 
 int parse_proc_stat(int statfd, struct proc_stat *out) {
     char buf[1024];
@@ -130,11 +154,9 @@ int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
     struct proc_stat child_status;
     struct stat tty_st, console_st, st;
     char buf[PATH_MAX];
-    int n = 0, allocated = 0;
-    int *fds = NULL;
+    struct fd_array fds = {};
     DIR *dir;
     struct dirent *d;
-    int *tmp = NULL;
 
     debug("Looking up fds for tty in child.");
     if ((child->error = parse_proc_stat(statfd, &child_status)))
@@ -166,26 +188,18 @@ int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
         if (st.st_rdev == child_status.ctty
             || st.st_rdev == tty_st.st_rdev
             || st.st_rdev == console_st.st_rdev) {
-            if (n == allocated) {
-                allocated = allocated ? 2 * allocated : 2;
-                tmp = xreallocarray(fds, allocated, sizeof *tmp);
-                if (tmp == NULL) {
-                  child->error = assert_nonzero(errno);
-                  error("Unable to allocate memory for fd array.");
-                  free(fds);
-                  fds = NULL;
-                  goto out;
-                }
-                fds = tmp;
-            }
             debug("Found an alias for the tty: %s", d->d_name);
-            fds[n++] = atoi(d->d_name);
+            if (fd_array_push(&fds, atoi(d->d_name)) != 0) {
+                child->error = assert_nonzero(errno);
+                error("Unable to allocate memory for fd array.");
+                goto out;
+            }
         }
     }
  out:
-    *count = n;
+    *count = fds.n;
     closedir(dir);
-    return fds;
+    return fds.fds;
 }
 
 void move_process_group(struct ptrace_child *child, pid_t from, pid_t to) {
