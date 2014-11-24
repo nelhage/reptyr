@@ -1,4 +1,4 @@
-override CFLAGS+=-Wall -Werror -D_GNU_SOURCE -g -O0
+override CFLAGS+=-Wall -Werror -D_GNU_SOURCE -g
 OBJS=reptyr.o reallocarray.o attach.o
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
@@ -21,10 +21,6 @@ reptyr: $(OBJS)
 attach.o: reptyr.h ptrace.h
 reptyr.o: reptyr.h reallocarray.h
 ptrace.o: ptrace.h platform/platform.h $(wildcard platform/*/arch/*.h)
-#platform/freebsd/freebsd.o: ptrace.h platform/platform.h $(wildcard platform/freebsd/arch/*.h)
-#platform/freebsd/freebsd_ptrace.o: ptrace.h platform/platform.h $(wildcard platform/freebsd/arch/*.h)
-#platform/linux/linux.o: ptrace.h platform/platform.h $(wildcard platform/linux/arch/*.h)
-#platform/linux/linux_ptrace.o: ptrace.h platform/platform.h $(wildcard platform/linux/arch/*.h)
 
 clean:
 	rm -f reptyr $(OBJS)
