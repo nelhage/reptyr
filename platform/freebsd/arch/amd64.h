@@ -59,14 +59,13 @@ struct x86_personality x86_personality[2] = {
 
 struct syscall_numbers arch_syscall_numbers[2] = {
 #include "default-syscalls.h"
-    {
-    }
+#include "default-syscalls.h"
 };
 
 int arch_get_personality(struct ptrace_child *child) {
     unsigned long cs;
 
-	cs = arch_get_register(child,offsetof(struct reg, r_cs));
+    cs = arch_get_register(child,offsetof(struct reg, r_cs));
     if (child->error)
         return -1;
     if (cs == 0x23)

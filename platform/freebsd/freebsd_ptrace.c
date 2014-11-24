@@ -90,8 +90,7 @@ static struct ptrace_personality *personality(struct ptrace_child *child) {
 }
 
 struct syscall_numbers *ptrace_syscall_numbers(struct ptrace_child *child) {
-    //return &arch_syscall_numbers[child->personality];
-    return &arch_syscall_numbers[0];
+    return &arch_syscall_numbers[child->personality];
 }
 
 int ptrace_attach_child(struct ptrace_child *child, pid_t pid) {

@@ -216,7 +216,8 @@ int get_process_tty_termios(pid_t pid, struct termios *tio) {
                     }
                     else {
                         close(fd);
-                        return 0;
+                        err = 0;
+                        goto done;
                     }
                 }
                 close(fd);
@@ -224,6 +225,7 @@ int get_process_tty_termios(pid_t pid, struct termios *tio) {
         }
     }
 
+done:
     procstat_freefiles(procstat, head);
     procstat_freeprocs(procstat, kp);
     procstat_close(procstat);
