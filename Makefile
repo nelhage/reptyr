@@ -1,6 +1,13 @@
 override CFLAGS+=-Wall -Werror -D_GNU_SOURCE -g
-OBJS=reptyr.o ptrace.o reallocarray.o attach.o
-
+OBJS=reptyr.o reallocarray.o attach.o
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Linux)
+	OBJS += platform/linux/linux_ptrace.o platform/linux/linux.o
+endif
+ifeq ($(UNAME_S),FreeBSD)
+	OBJS += platform/freebsd/freebsd_ptrace.o platform/freebsd/freebsd.o
+	LDFLAGS += -lprocstat
+endif
 # Note that because of how Make works, this can be overriden from the
 # command-line.
 #
@@ -13,7 +20,7 @@ reptyr: $(OBJS)
 
 attach.o: reptyr.h ptrace.h
 reptyr.o: reptyr.h reallocarray.h
-ptrace.o: ptrace.h $(wildcard arch/*.h)
+ptrace.o: ptrace.h platform/platform.h $(wildcard platform/*/arch/*.h)
 
 clean:
 	rm -f reptyr $(OBJS)

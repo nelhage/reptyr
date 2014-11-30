@@ -39,25 +39,11 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <linux/major.h>
-#include <linux/net.h>
 
 #include "ptrace.h"
 #include "reptyr.h"
 #include "reallocarray.h"
-
-#define assert_nonzero(expr) ({                         \
-            typeof(expr) __val = expr;                  \
-            if (__val == 0)                             \
-                die("Unexpected: %s == 0!\n", #expr);   \
-            __val;                                      \
-        })
-
-struct fd_array {
-    int *fds;
-    int n;
-    int allocated;
-};
+#include "platform/platform.h"
 
 int fd_array_push(struct fd_array *fda, int fd) {
     int *tmp;
@@ -77,153 +63,10 @@ int fd_array_push(struct fd_array *fda, int fd) {
     return 0;
 }
 
-#define TASK_COMM_LENGTH 16
-struct proc_stat {
-    pid_t pid;
-    char comm[TASK_COMM_LENGTH+1];
-    char state;
-    pid_t ppid, sid, pgid;
-    dev_t ctty;
-};
-
-#define do_syscall(child, name, a0, a1, a2, a3, a4, a5) \
-    ptrace_remote_syscall((child), ptrace_syscall_numbers((child))->nr_##name, \
-                          a0, a1, a2, a3, a4, a5)
-
-// Define lowercased versions of the socketcall numbers, so that we
-// can assemble them with ## in the macro below
-#define socketcall_socket SYS_SOCKET
-#define socketcall_connect SYS_CONNECT
-#define socketcall_sendmsg SYS_SENDMSG
-
-#define do_socketcall(child, name, a0, a1, a2, a3, a4)                  \
-    ({                                                                  \
-        int __ret;                                                      \
-        if (ptrace_syscall_numbers((child))->nr_##name) {               \
-            __ret = do_syscall((child), name, a0, a1, a2, a3, a4, 0);   \
-        } else {                                                        \
-            __ret = do_syscall((child), socketcall, socketcall_##name,  \
-                               a0, a1, a2, a3, a4);                     \
-        }                                                               \
-        __ret; })
-
-int parse_proc_stat(int statfd, struct proc_stat *out) {
-    char buf[1024];
-    int n;
-    unsigned dev;
-    lseek(statfd, 0, SEEK_SET);
-    if (read(statfd, buf, sizeof buf) < 0)
-        return assert_nonzero(errno);
-    n = sscanf(buf, "%d (%16[^)]) %c %d %d %d %u",
-               &out->pid, out->comm,
-               &out->state, &out->ppid, &out->pgid,
-               &out->sid, &dev);
-    if (n == EOF)
-        return assert_nonzero(errno);
-    if (n != 7) {
-        return EINVAL;
-    }
-    out->ctty = dev;
-    return 0;
-}
-
-int read_proc_stat(pid_t pid, struct proc_stat *out) {
-    char stat_path[PATH_MAX];
-    int statfd;
-    int err;
-
-    snprintf(stat_path, sizeof stat_path, "/proc/%d/stat", pid);
-    statfd = open(stat_path, O_RDONLY);
-    if (statfd < 0) {
-        error("Unable to open %s: %s", stat_path, strerror(errno));
-        return -statfd;
-    }
-
-    err = parse_proc_stat(statfd, out);
-    close(statfd);
-    return err;
-}
-
 static void do_unmap(struct ptrace_child *child, child_addr_t addr, unsigned long len) {
-    if (addr == (unsigned long)-1)
+    if (addr == (child_addr_t) - 1)
         return;
-    do_syscall(child, munmap, addr, len, 0, 0, 0, 0);
-}
-
-int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
-    struct proc_stat child_status;
-    struct stat tty_st, console_st, st;
-    char buf[PATH_MAX];
-    struct fd_array fds = {};
-    DIR *dir;
-    struct dirent *d;
-
-    debug("Looking up fds for tty in child.");
-    if ((child->error = parse_proc_stat(statfd, &child_status)))
-        return NULL;
-
-    debug("Resolved child tty: %x", (unsigned)child_status.ctty);
-
-    if (stat("/dev/tty", &tty_st) < 0) {
-        child->error = assert_nonzero(errno);
-        error("Unable to stat /dev/tty");
-        return NULL;
-    }
-
-    if (stat("/dev/console", &console_st) < 0) {
-        child->error = errno;
-        error("Unable to stat /dev/console");
-        return NULL;
-    }
-
-    snprintf(buf, sizeof buf, "/proc/%d/fd/", child->pid);
-    if ((dir = opendir(buf)) == NULL)
-        return NULL;
-    while ((d = readdir(dir)) != NULL) {
-        if (d->d_name[0] == '.') continue;
-        snprintf(buf, sizeof buf, "/proc/%d/fd/%s", child->pid, d->d_name);
-        if (stat(buf, &st) < 0)
-            continue;
-
-        if (st.st_rdev == child_status.ctty
-            || st.st_rdev == tty_st.st_rdev
-            || st.st_rdev == console_st.st_rdev) {
-            debug("Found an alias for the tty: %s", d->d_name);
-            if (fd_array_push(&fds, atoi(d->d_name)) != 0) {
-                child->error = assert_nonzero(errno);
-                error("Unable to allocate memory for fd array.");
-                goto out;
-            }
-        }
-    }
- out:
-    *count = fds.n;
-    closedir(dir);
-    return fds.fds;
-}
-
-void move_process_group(struct ptrace_child *child, pid_t from, pid_t to) {
-    DIR *dir;
-    struct dirent *d;
-    pid_t pid;
-    char *p;
-    int err;
-
-    if ((dir = opendir("/proc/")) == NULL)
-        return;
-
-    while ((d = readdir(dir)) != NULL) {
-        if (d->d_name[0] == '.') continue;
-        pid = strtol(d->d_name, &p, 10);
-        if (*p) continue;
-        if (getpgid(pid) == from) {
-            debug("Change pgid for pid %d", pid);
-            err = do_syscall(child, setpgid, pid, to, 0, 0, 0, 0);
-            if (err < 0)
-                error(" failed: %s", strerror(-err));
-        }
-    }
-    closedir(dir);
+    do_syscall(child, munmap, (unsigned long)addr, len, 0, 0, 0, 0);
 }
 
 int do_setsid(struct ptrace_child *child) {
@@ -241,7 +84,7 @@ int do_setsid(struct ptrace_child *child) {
         goto out_kill;
 
     dummy.state = ptrace_after_syscall;
-    memcpy(&dummy.user, &child->user, sizeof child->user);
+    copy_user(&dummy, child);
     if (ptrace_restore_regs(&dummy)) {
         err = dummy.error;
         goto out_kill;
@@ -264,15 +107,15 @@ int do_setsid(struct ptrace_child *child) {
 
     debug("Did setsid()");
 
- out_kill:
+out_kill:
     kill(dummy.pid, SIGKILL);
     ptrace_detach_child(&dummy);
-    ptrace_wait(&dummy);
+    //ptrace_wait(&dummy);
     do_syscall(child, wait4, dummy.pid, 0, WNOHANG, 0, 0, 0);
     return err;
 }
 
-int ignore_hup(struct ptrace_child *child, unsigned long scratch_page) {
+int ignore_hup(struct ptrace_child *child, child_addr_t scratch_page) {
     int err;
     if (ptrace_syscall_numbers(child)->nr_signal != -1) {
         err = do_syscall(child, signal, SIGHUP, (unsigned long)SIG_IGN, 0, 0, 0, 0);
@@ -285,7 +128,7 @@ int ignore_hup(struct ptrace_child *child, unsigned long scratch_page) {
         if (err < 0)
             return err;
         err = do_syscall(child, rt_sigaction,
-                         SIGHUP, scratch_page,
+                         SIGHUP, (unsigned long)scratch_page,
                          0, 8, 0, 0);
     }
     return err;
@@ -304,13 +147,12 @@ int ignore_hup(struct ptrace_child *child, unsigned long scratch_page) {
 void wait_for_stop(pid_t pid, int fd) {
     struct timeval start, now;
     struct timespec sleep;
-    struct proc_stat st;
 
     gettimeofday(&start, NULL);
     while (1) {
         gettimeofday(&now, NULL);
         if ((now.tv_sec > start.tv_sec && now.tv_usec > start.tv_usec)
-            || (now.tv_sec - start.tv_sec > 1)) {
+                || (now.tv_sec - start.tv_sec > 1)) {
             error("Timed out waiting for child stop.");
             break;
         }
@@ -318,9 +160,7 @@ void wait_for_stop(pid_t pid, int fd) {
          * If anything goes wrong reading or parsing the stat node, just give
          * up.
          */
-        if (parse_proc_stat(fd, &st))
-            break;
-        if (st.state == 'T')
+        if (check_proc_stopped(pid, fd))
             break;
 
         sleep.tv_sec  = 0;
@@ -330,31 +170,10 @@ void wait_for_stop(pid_t pid, int fd) {
 }
 
 int copy_tty_state(pid_t pid, const char *pty) {
-    char buf[PATH_MAX];
     int fd, err = EINVAL;
     struct termios tio;
-    int i;
 
-    for (i = 0; i < 3 && err; i++) {
-        err = 0;
-        snprintf(buf, sizeof buf, "/proc/%d/fd/%d", pid, i);
-
-        if ((fd = open(buf, O_RDONLY)) < 0) {
-            err = -fd;
-            continue;
-        }
-
-        if (!isatty(fd)) {
-            err = ENOTTY;
-            goto retry;
-        }
-
-        if (tcgetattr(fd, &tio) < 0) {
-            err = -assert_nonzero(errno);
-        }
-    retry:
-        close(fd);
-    }
+    err = get_process_tty_termios(pid, &tio);
 
     if (err)
         return err;
@@ -368,66 +187,19 @@ int copy_tty_state(pid_t pid, const char *pty) {
     return -err;
 }
 
-int check_pgroup(pid_t target) {
-    pid_t pg;
-    DIR *dir;
-    struct dirent *d;
-    pid_t pid;
-    char *p;
-    int err = 0;
-    struct proc_stat pid_stat;
-
-    debug("Checking for problematic process group members...");
-
-    pg = getpgid(target);
-    if (pg < 0) {
-        error("Unable to get pgid for pid %d", (int)target);
-        return errno;
-    }
-
-    if ((dir = opendir("/proc/")) == NULL)
-        return assert_nonzero(errno);
-
-    while ((d = readdir(dir)) != NULL) {
-        if (d->d_name[0] == '.') continue;
-        pid = strtol(d->d_name, &p, 10);
-        if (*p) continue;
-        if (pid == target) continue;
-        if (getpgid(pid) == pg) {
-            /*
-             * We are actually being somewhat overly-conservative here
-             * -- if pid is a child of target, and has not yet called
-             * execve(), reptyr's setpgid() strategy may suffice. That
-             * is a fairly rare case, and annoying to check for, so
-             * for now let's just bail out.
-             */
-            if ((err = read_proc_stat(pid, &pid_stat))) {
-                memcpy(pid_stat.comm, "???", 4);
-            }
-            error("Process %d (%.*s) shares %d's process group. Unable to attach.\n"
-                  "(This most commonly means that %d has suprocesses).",
-                  (int)pid, TASK_COMM_LENGTH, pid_stat.comm, (int)target, (int)target);
-            err = EINVAL;
-            goto out;
-        }
-    }
- out:
-    closedir(dir);
-    return err;
-}
-
-int mmap_scratch(struct ptrace_child *child, unsigned long *addr) {
+int mmap_scratch(struct ptrace_child *child, child_addr_t *addr) {
     long mmap_syscall;
-    unsigned long scratch_page;
+    child_addr_t scratch_page;
 
     mmap_syscall = ptrace_syscall_numbers(child)->nr_mmap2;
     if (mmap_syscall == -1)
         mmap_syscall = ptrace_syscall_numbers(child)->nr_mmap;
     scratch_page = ptrace_remote_syscall(child, mmap_syscall, 0,
-                                         sysconf(_SC_PAGE_SIZE), PROT_READ|PROT_WRITE,
-                                         MAP_ANONYMOUS|MAP_PRIVATE, 0, 0);
+                                         sysconf(_SC_PAGE_SIZE), PROT_READ | PROT_WRITE,
+                                         MAP_ANONYMOUS | MAP_SHARED, -1, 0);
+    //MAP_ANONYMOUS|MAP_PRIVATE, -1, 0);
 
-    if (scratch_page > (unsigned long)-1000) {
+    if (scratch_page > (unsigned long) - 1000) {
         return -(signed long)scratch_page;
     }
 
@@ -437,7 +209,7 @@ int mmap_scratch(struct ptrace_child *child, unsigned long *addr) {
     return 0;
 }
 
-int grab_pid(pid_t pid, struct ptrace_child *child, unsigned long *scratch) {
+int grab_pid(pid_t pid, struct ptrace_child *child, child_addr_t *scratch) {
     int err;
 
     if (ptrace_attach_child(child, pid)) {
@@ -458,10 +230,10 @@ int grab_pid(pid_t pid, struct ptrace_child *child, unsigned long *scratch) {
 
     return 0;
 
- out_restore_regs:
+out_restore_regs:
     ptrace_restore_regs(child);
 
- out:
+out:
     ptrace_detach_child(child);
 
     return err;
@@ -469,16 +241,20 @@ int grab_pid(pid_t pid, struct ptrace_child *child, unsigned long *scratch) {
 
 int attach_child(pid_t pid, const char *pty, int force_stdio) {
     struct ptrace_child child;
-    unsigned long scratch_page = -1;
-    int *child_tty_fds = NULL, n_fds, child_fd, statfd;
+    child_addr_t scratch_page = -1;
+    int *child_tty_fds = NULL, n_fds, child_fd, statfd = -1;
     int i;
     int err = 0;
     long page_size = sysconf(_SC_PAGE_SIZE);
+#ifdef __linux__
     char stat_path[PATH_MAX];
+#endif
 
     if ((err = check_pgroup(pid))) {
         return err;
     }
+
+    debug("Using tty: %s", pty);
 
     if ((err = copy_tty_state(pid, pty))) {
         if (err == ENOTTY && !force_stdio) {
@@ -488,12 +264,14 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
         }
     }
 
+#ifdef __linux__
     snprintf(stat_path, sizeof stat_path, "/proc/%d/stat", pid);
     statfd = open(stat_path, O_RDONLY);
     if (statfd < 0) {
         error("Unable to open %s: %s", stat_path, strerror(errno));
         return -statfd;
     }
+#endif
 
     kill(pid, SIGTSTP);
     wait_for_stop(pid, statfd);
@@ -520,14 +298,14 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
         }
     }
 
-    if (ptrace_memcpy_to_child(&child, scratch_page, pty, strlen(pty)+1)) {
+    if (ptrace_memcpy_to_child(&child, scratch_page, pty, strlen(pty) + 1)) {
         err = child.error;
         error("Unable to memcpy the pty path to child.");
         goto out_free_fds;
     }
 
     child_fd = do_syscall(&child, open,
-                          scratch_page, O_RDWR|O_NOCTTY,
+                          scratch_page, O_RDWR | O_NOCTTY,
                           0, 0, 0, 0);
     if (child_fd < 0) {
         err = child_fd;
@@ -551,26 +329,29 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
     if (err < 0)
         goto out_close;
 
-    err = do_syscall(&child, ioctl, child_fd, TIOCSCTTY, 0, 0, 0, 0);
-    if (err < 0) {
-        error("Unable to set controlling terminal.");
+    err = do_syscall(&child, ioctl, child_fd, TIOCSCTTY, 1, 0, 0, 0);
+    if (err != 0) { /* Seems to be returning >0 for error */
+        error("Unable to set controlling terminal: %s", strerror(err));
         goto out_close;
     }
 
     debug("Set the controlling tty");
 
-    for (i = 0; i < n_fds; i++)
-        do_syscall(&child, dup2, child_fd, child_tty_fds[i], 0, 0, 0, 0);
+    for (i = 0; i < n_fds; i++) {
+        err = do_syscall(&child, dup2, child_fd, child_tty_fds[i], 0, 0, 0, 0);
+        if (err < 0)
+            error("Problem moving child fd number %d to new tty: %s", child_tty_fds[i], strerror(errno));
+    }
 
 
     err = 0;
 
- out_close:
+out_close:
     do_syscall(&child, close, child_fd, 0, 0, 0, 0, 0);
- out_free_fds:
+out_free_fds:
     free(child_tty_fds);
 
- out_unmap:
+out_unmap:
     do_unmap(&child, scratch_page, page_size);
 
     ptrace_restore_regs(&child);
@@ -581,67 +362,13 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
         wait_for_stop(child.pid, statfd);
     }
     kill(child.pid, SIGWINCH);
- out_cont:
+out_cont:
     kill(child.pid, SIGCONT);
+#ifdef __linux__
     close(statfd);
+#endif
 
     return err < 0 ? -err : err;
-}
-
-struct steal_pty_state {
-    struct proc_stat target_stat;
-
-    pid_t emulator_pid;
-    struct fd_array master_fds;
-
-    char tmpdir[PATH_MAX];
-    union {
-        struct sockaddr addr;
-        struct sockaddr_un addr_un;
-    };
-    int sockfd;
-
-    struct ptrace_child child;
-    unsigned long child_scratch;
-    int child_fd;
-
-    int ptyfd;
-};
-
-// Find the PID of the terminal emulator for `target's terminal.
-//
-// We assume that the terminal emulator is the parent of the session
-// leader. This is true in most cases, although in principle you can
-// construct situations where it is false. We should fail safe later
-// on if this turns out to be wrong, however.
-int find_terminal_emulator(struct steal_pty_state *steal) {
-    debug("session leader of pid %d = %d",
-          (int)steal->target_stat.pid,
-          (int)steal->target_stat.sid);
-    struct proc_stat leader_st;
-    int err;
-    if ((err = read_proc_stat(steal->target_stat.sid, &leader_st)))
-        return err;
-    debug("found terminal emulator process: %d", (int) leader_st.ppid);
-    steal->emulator_pid = leader_st.ppid;
-    return 0;
-}
-
-int get_terminal_state(struct steal_pty_state *steal, pid_t target) {
-    int err;
-
-    if ((err = read_proc_stat(target, &steal->target_stat)))
-        return err;
-
-    if (major(steal->target_stat.ctty) != UNIX98_PTY_SLAVE_MAJOR) {
-        error("Child is not connected to a pseudo-TTY. Unable to steal TTY.");
-        return EINVAL;
-    }
-
-    if ((err = find_terminal_emulator(steal)))
-        return err;
-
-    return 0;
 }
 
 int setup_steal_socket(struct steal_pty_state *steal) {
@@ -662,68 +389,6 @@ int setup_steal_socket(struct steal_pty_state *steal) {
     return 0;
 }
 
-// ptmx(4) and Linux Documentation/devices.txt document
-// /dev/ptmx has having major 5 and minor 2. I can't find any
-// constants in headers after a brief glance that I should be
-// using here.
-#define PTMX_DEVICE (makedev(5, 2))
-
-// Find the fd(s) in the terminal emulator process that corresponds to
-// the master side of the target's pty. Store the result in
-// steal->master_fds.
-int find_master_fd(struct steal_pty_state *steal) {
-    DIR *dir;
-    struct dirent *d;
-    struct stat st;
-    int err;
-    char buf[PATH_MAX];
-
-    snprintf(buf, sizeof buf, "/proc/%d/fd/", steal->child.pid);
-    if ((dir = opendir(buf)) == NULL)
-        return errno;
-    while ((d = readdir(dir)) != NULL) {
-        if (d->d_name[0] == '.') continue;
-        snprintf(buf, sizeof buf, "/proc/%d/fd/%s", steal->child.pid, d->d_name);
-        if (stat(buf, &st) < 0)
-            continue;
-
-        debug("Checking fd: %s: st_dev=%x", d->d_name, (int)st.st_rdev);
-
-        if (st.st_rdev != PTMX_DEVICE)
-            continue;
-
-        debug("found a ptmx fd: %s", d->d_name);
-        err = do_syscall(&steal->child, ioctl,
-                         atoi(d->d_name),
-                         TIOCGPTN,
-                         steal->child_scratch,
-                         0, 0, 0);
-        if (err < 0) {
-            debug(" error doing TIOCGPTN: %s", strerror(-err));
-            continue;
-        }
-        int ptn;
-        err = ptrace_memcpy_from_child(&steal->child, &ptn,
-                                       steal->child_scratch, sizeof(ptn));
-        if (err < 0) {
-            debug(" error getting ptn: %s", strerror(steal->child.error));
-            continue;
-        }
-        if (ptn == (int)minor(steal->target_stat.ctty)) {
-            debug("found a master fd: %d", atoi(d->d_name));
-            if (fd_array_push(&steal->master_fds, atoi(d->d_name)) != 0) {
-                error("unable to allocate memory for fd array!");
-                return ENOMEM;
-            }
-        }
-    }
-
-    if (steal->master_fds.n == 0) {
-        return ESRCH;
-    }
-    return 0;
-}
-
 int setup_steal_socket_child(struct steal_pty_state *steal) {
     int err;
     err = do_socketcall(&steal->child, socket, AF_UNIX, SOCK_DGRAM, 0, 0, 0);
@@ -736,7 +401,7 @@ int setup_steal_socket_child(struct steal_pty_state *steal) {
     if (err < 0)
         return steal->child.error;
     err = do_socketcall(&steal->child, connect, steal->child_fd, steal->child_scratch,
-                     sizeof(steal->addr_un),0,0);
+                        sizeof(steal->addr_un), 0, 0);
     if (err < 0)
         return -err;
     debug("Connected to the shared socket.");
@@ -772,9 +437,9 @@ int steal_child_pty(struct steal_pty_state *steal) {
 
     steal->child.error = 0;
     err = do_socketcall(&steal->child, sendmsg,
-                     steal->child_fd,
-                     steal->child_scratch,
-                     MSG_DONTWAIT, 0,0);
+                        steal->child_fd,
+                        steal->child_scratch,
+                        MSG_DONTWAIT, 0, 0);
     if (err < 0) {
         return steal->child.error ? steal->child.error : -err;
     }
@@ -810,7 +475,7 @@ int steal_child_pty(struct steal_pty_state *steal) {
 // it doesn't die.
 int steal_block_hup(struct steal_pty_state *steal) {
     struct ptrace_child leader;
-    unsigned long scratch;
+    child_addr_t scratch;
     int err = 0;
 
     if ((err = grab_pid(steal->target_stat.sid, &leader, &scratch)))

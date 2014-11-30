@@ -19,6 +19,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#ifndef PTRACE_H
+#define PTRACE_H
+
 #include <sys/ptrace.h>
 #include <sys/user.h>
 #include <unistd.h>
@@ -57,8 +60,13 @@ struct ptrace_child {
     int status;
     int error;
     unsigned long forked_pid;
-    struct user user;
     unsigned long saved_syscall;
+#ifdef __linux__
+	struct user user;
+#endif
+#ifdef __FreeBSD__
+	struct reg regs;
+#endif
 };
 
 struct syscall_numbers {
@@ -102,3 +110,5 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
 int ptrace_memcpy_to_child(struct ptrace_child *, child_addr_t, const void*, size_t);
 int ptrace_memcpy_from_child(struct ptrace_child *, void*, child_addr_t, size_t);
 struct syscall_numbers *ptrace_syscall_numbers(struct ptrace_child *child);
+
+#endif
