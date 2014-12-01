@@ -4,4 +4,4 @@ env:
   - CFLAGS=-m64 LDFLAGS=-m64
   - VICTIM_CFLAGS=-m32 VICTIM_CFLAGS=-m32
 before_install:
-  - sudo apt-get install gcc-multilib
+  - sudo apt-get -y install gcc-multilib python-pexpect
