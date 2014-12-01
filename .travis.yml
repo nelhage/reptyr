@@ -2,6 +2,6 @@ script: make test
 env:
   - CFLAGS=-m32 LDFLAGS=-m32
   - CFLAGS=-m64 LDFLAGS=-m64
-  - VICTIM_CFLAGS=-m32 VICTIM_CFLAGS=-m32
+  - VICTIM_CFLAGS=-m32 VICTIM_LDFLAGS=-m32
 before_install:
   - sudo apt-get -y install gcc-multilib python-pexpect
