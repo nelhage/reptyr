@@ -117,20 +117,18 @@ out_kill:
 
 int ignore_hup(struct ptrace_child *child, child_addr_t scratch_page) {
     int err;
-    if (ptrace_syscall_numbers(child)->nr_signal != -1) {
-        err = do_syscall(child, signal, SIGHUP, (unsigned long)SIG_IGN, 0, 0, 0, 0);
-    } else {
-        struct sigaction act = {
-            .sa_handler = SIG_IGN,
-        };
-        err = ptrace_memcpy_to_child(child, scratch_page,
-                                     &act, sizeof act);
-        if (err < 0)
-            return err;
-        err = do_syscall(child, rt_sigaction,
-                         SIGHUP, (unsigned long)scratch_page,
-                         0, 8, 0, 0);
-    }
+
+    struct sigaction act = {
+        .sa_handler = SIG_IGN,
+    };
+    err = ptrace_memcpy_to_child(child, scratch_page,
+                                 &act, sizeof act);
+    if (err < 0)
+        return err;
+    err = do_syscall(child, rt_sigaction,
+                     SIGHUP, (unsigned long)scratch_page,
+                     0, 8, 0, 0);
+
     return err;
 }
 
