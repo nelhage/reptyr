@@ -494,7 +494,7 @@ int steal_cleanup_child(struct steal_pty_state *steal) {
         return steal->child.error;
     }
 
-    int nullfd = do_syscall(&steal->child, open, steal->child_scratch, O_RDONLY, 0, 0, 0, 0);
+    int nullfd = do_syscall(&steal->child, open, steal->child_scratch, O_RDWR, 0, 0, 0, 0);
     if (nullfd < 0) {
         return steal->child.error;
     }
