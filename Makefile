@@ -20,6 +20,7 @@ reptyr: $(OBJS)
 
 test: reptyr test/victim PHONY
 	python test/basic.py
+	python test/tty-steal.py
 
 VICTIM_CFLAGS ?= $(CFLAGS)
 VICTIM_LDFLAGS ?= $(LDFLAGS)
