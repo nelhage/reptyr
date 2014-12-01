@@ -18,12 +18,21 @@ all: reptyr
 
 reptyr: $(OBJS)
 
+test: reptyr test/victim PHONY
+	python test/basic.py
+
+VICTIM_CFLAGS ?= $(CFLAGS)
+VICTIM_LDFLAGS ?= $(LDFLAGS)
+test/victim: test/victim.o
+test/victim: override CFLAGS := $(VICTIM_CFLAGS)
+test/victim: override LDFLAGS := $(VICTIM_LDFLAGS)
+
 attach.o: reptyr.h ptrace.h
 reptyr.o: reptyr.h reallocarray.h
 ptrace.o: ptrace.h platform/platform.h $(wildcard platform/*/arch/*.h)
 
 clean:
-	rm -f reptyr $(OBJS)
+	rm -f reptyr $(OBJS) test/victim.o test/victim
 
 install: reptyr
 	install -d -m 755 $(DESTDIR)$(PREFIX)/bin/
@@ -32,3 +41,5 @@ install: reptyr
 	install -m 644 reptyr.1 $(DESTDIR)$(PREFIX)/share/man/man1/reptyr.1
 	install -d -m 755 $(DESTDIR)$(PREFIX)/share/man/fr/man1
 	install -m 644 reptyr.fr.1 $(DESTDIR)$(PREFIX)/share/man/fr/man1/reptyr.1
+
+.PHONY: PHONY
