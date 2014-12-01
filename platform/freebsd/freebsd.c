@@ -93,7 +93,6 @@ int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
     struct kinfo_proc *kp;
     unsigned int cnt;
     struct fd_array fds = {};
-    int *tmp = NULL;
     struct vnstat vn;
     int er;
     char errbuf[_POSIX2_LINE_MAX];
@@ -110,9 +109,8 @@ int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
 
             if (vn.vn_dev == kp->ki_tdev) {
                 if (fd_array_push(&fds, fst->fs_fd) != 0) {
-                        error("Unable to allocate memory for fd array.");
-                        goto out;
-                    }
+                    error("Unable to allocate memory for fd array.");
+                    goto out;
                 }
             }
         }
@@ -122,7 +120,7 @@ out:
     procstat_freefiles(procstat, head);
     procstat_freeprocs(procstat, kp);
     procstat_close(procstat);
-    *count = fdd.n;
+    *count = fds.n;
     debug("Found %d tty fds in child %d.", fds.n, child->pid);
     return fds.fds;
 }
