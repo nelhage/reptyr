@@ -45,6 +45,8 @@ struct proc_stat {
     char state;
     pid_t ppid, sid, pgid;
     dev_t ctty;
+    uid_t uid;
+    gid_t gid;
 };
 
 struct steal_pty_state {

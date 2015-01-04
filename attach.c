@@ -384,6 +384,9 @@ int setup_steal_socket(struct steal_pty_state *steal) {
     if (bind(steal->sockfd, &steal->addr, sizeof(steal->addr_un)) < 0)
         return errno;
 
+    chown(steal->addr_un.sun_path, steal->target_stat.uid, steal->target_stat.gid);
+    chown(steal->tmpdir, steal->target_stat.uid, steal->target_stat.gid);
+
     return 0;
 }
 

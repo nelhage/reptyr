@@ -44,6 +44,14 @@ int parse_proc_stat(int statfd, struct proc_stat *out) {
         return EINVAL;
     }
     out->ctty = dev;
+
+    struct stat st;
+    if (fstat(statfd, &st) != 0)
+        return assert_nonzero(errno);
+
+    out->uid = st.st_uid;
+    out->gid = st.st_gid;
+
     return 0;
 }
 
