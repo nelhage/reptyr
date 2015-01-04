@@ -1,3 +1,9 @@
+* 0.6 (Jul 4, 2015)
+ - Add -T ("tty-stealing") mode, which works on processes with children.
+   See https://blog.nelhage.com/2014/08/new-reptyr-feature-tty-stealing/
+ - Added FreeBSD support
+ - Minor bugfixes
+
 * 0.5 (Jun 5, 2013)
  - Add an early check and error if attaching a process with children.
 
