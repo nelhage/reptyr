@@ -20,7 +20,7 @@
  * THE SOFTWARE.
  */
 
-#define REPTYR_VERSION "0.6"
+#define REPTYR_VERSION "0.6.1"
 
 #define assert_nonzero(expr) ({                         \
             typeof(expr) __val = expr;                  \

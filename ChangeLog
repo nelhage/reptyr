@@ -1,4 +1,7 @@
-* 0.6 (Jul 4, 2015)
+* 0.6.1 (Jan 18, 2015)
+ - Fix compilation when chown is declared as `warn_unused_result``
+
+* 0.6 (Jan 4, 2015)
  - Add -T ("tty-stealing") mode, which works on processes with children.
    See https://blog.nelhage.com/2014/08/new-reptyr-feature-tty-stealing/
  - Added FreeBSD support
