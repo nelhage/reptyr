@@ -49,6 +49,14 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 
+struct ptrace_child;
+unsigned long ptrace_socketcall(struct ptrace_child *child,
+                                unsigned long scratch,
+                                unsigned long socketcall,
+                                unsigned long p0, unsigned long p1,
+                                unsigned long p2, unsigned long p3,
+                                unsigned long p4);
+
 
 #define socketcall_socket SYS_SOCKET
 #define socketcall_connect SYS_CONNECT
@@ -56,14 +64,15 @@
 
 // Define lowercased versions of the socketcall numbers, so that we
 // can assemble them with ## in the macro below
-#define do_socketcall(child, name, a0, a1, a2, a3, a4)                  \
+#define do_socketcall(child, scratch, name, a0, a1, a2, a3, a4)          \
     ({                                                                  \
         int __ret;                                                      \
         if (ptrace_syscall_numbers((child))->nr_##name) {               \
             __ret = do_syscall((child), name, a0, a1, a2, a3, a4, 0);   \
         } else {                                                        \
-            __ret = do_syscall((child), socketcall, socketcall_##name,  \
-                               a0, a1, a2, a3, a4);                     \
+            __ret = ptrace_socketcall((child), (scratch),               \
+                                      socketcall_##name,                \
+                                      a0, a1, a2, a3, a4);              \
         }                                                               \
         __ret; })
 

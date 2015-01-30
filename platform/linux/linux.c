@@ -26,6 +26,7 @@
 #include "../platform.h"
 #include "../../reptyr.h"
 #include "../../ptrace.h"
+#include <stdint.h>
 
 int parse_proc_stat(int statfd, struct proc_stat *out) {
     char buf[1024];
@@ -363,5 +364,25 @@ void move_process_group(struct ptrace_child *child, pid_t from, pid_t to) {
 void copy_user(struct ptrace_child *d, struct ptrace_child *s) {
     memcpy(&d->user, &s->user, sizeof(s->user));
 }
+
+unsigned long ptrace_socketcall(struct ptrace_child *child,
+                                unsigned long scratch,
+                                unsigned long socketcall,
+                                unsigned long p0, unsigned long p1,
+                                unsigned long p2, unsigned long p3,
+                                unsigned long p4)
+{
+    // We assume that socketcall is only used on 32-bit
+    // architectures. If there are any 64-bit architectures that do
+    // socketcall, and we port to them, this will need to change.
+    uint32_t args[] = {p0, p1, p2, p3, p4};
+    int err;
+
+    err = ptrace_memcpy_to_child(child, scratch, &args, sizeof args);
+    if (err < 0)
+        return (unsigned long)err;
+    return do_syscall(child, socketcall, socketcall, scratch, 0, 0, 0, 0);
+}
+
 
 #endif
