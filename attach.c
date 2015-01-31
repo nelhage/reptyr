@@ -395,7 +395,7 @@ int setup_steal_socket(struct steal_pty_state *steal) {
 int setup_steal_socket_child(struct steal_pty_state *steal) {
     int err;
     err = do_socketcall(&steal->child,
-                        steal->child_scratch + PAGE_SIZE/2,
+                        steal->child_scratch + sysconf(_SC_PAGE_SIZE)/2,
                         socket, AF_UNIX, SOCK_DGRAM, 0, 0, 0);
     if (err < 0)
         return -err;
@@ -406,7 +406,7 @@ int setup_steal_socket_child(struct steal_pty_state *steal) {
     if (err < 0)
         return steal->child.error;
     err = do_socketcall(&steal->child,
-                        steal->child_scratch + PAGE_SIZE/2,
+                        steal->child_scratch + sysconf(_SC_PAGE_SIZE)/2,
                         connect, steal->child_fd, steal->child_scratch,
                         sizeof(steal->addr_un), 0, 0);
     if (err < 0)
@@ -444,7 +444,7 @@ int steal_child_pty(struct steal_pty_state *steal) {
 
     steal->child.error = 0;
     err = do_socketcall(&steal->child,
-                        steal->child_scratch + PAGE_SIZE/2,
+                        steal->child_scratch + sysconf(_SC_PAGE_SIZE)/2,
                         sendmsg,
                         steal->child_fd,
                         steal->child_scratch,
