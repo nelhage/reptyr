@@ -39,6 +39,8 @@ ptrace.o: ptrace.h platform/platform.h $(wildcard platform/*/arch/*.h)
 clean:
 	rm -f reptyr $(OBJS) test/victim.o test/victim
 
+BASHCOMPDIR ?= $(shell pkg-config --variable=completionsdir bash-completion 2>/dev/null)
+
 install: reptyr
 	install -d -m 755 $(DESTDIR)$(PREFIX)/bin/
 	install -m 755 reptyr $(DESTDIR)$(PREFIX)/bin/reptyr
@@ -46,5 +48,9 @@ install: reptyr
 	install -m 644 reptyr.1 $(DESTDIR)$(PREFIX)/share/man/man1/reptyr.1
 	install -d -m 755 $(DESTDIR)$(PREFIX)/share/man/fr/man1
 	install -m 644 reptyr.fr.1 $(DESTDIR)$(PREFIX)/share/man/fr/man1/reptyr.1
+	bashcompdir=$(BASHCOMPDIR) ; \
+	test -z "$$bashcompdir" && bashcompdir=/etc/bash_completion.d ; \
+	install -d -m 755 $(DESTDIR)$$bashcompdir ; \
+	install -m 644 reptyr.bash $(DESTDIR)$$bashcompdir/reptyr
 
 .PHONY: PHONY
