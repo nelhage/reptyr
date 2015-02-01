@@ -1,3 +1,6 @@
+* 0.6.2 (Jan 31, 2015)
+ - Fix tty-stealing on i386
+
 * 0.6.1 (Jan 18, 2015)
  - Fix compilation when chown is declared as `warn_unused_result``
 
