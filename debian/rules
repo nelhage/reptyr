@@ -8,3 +8,11 @@ override_dh_auto_build:
 
 override_dh_auto_install:
 	dh_auto_install -- PREFIX=/usr
+
+# reptyr's test suite relies on being able to ptrace non-child
+# processes, which isn't allowed under yama's defaults on Ubuntu
+override_dh_auto_test:
+	if ! [ -f /proc/sys/kernel/yama/ptrace_scope ] || \
+	  [ "$$(cat /proc/sys/kernel/yama/ptrace_scope)" = 0 ]; then \
+	  dh_auto_test; \
+	fi

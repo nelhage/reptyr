@@ -1,9 +1,11 @@
 reptyr (0.6.2-1) UNRELEASED; urgency=low
 
-  * New release
+  * New release:
+    - Fixup build for tests by adding Python dependencies and disabling
+      tests when Yama would not allow them to run
   * Bump standards version to 3.9.6 (no changes).
 
- -- Evan Broder <evan@ebroder.net>  Sun, 08 Feb 2015 14:01:51 -1000
+ -- Evan Broder <evan@ebroder.net>  Sun, 08 Feb 2015 14:03:37 -1000
 
 reptyr (0.5-1) unstable; urgency=low
 
