@@ -19,19 +19,23 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#include "x86_common.h"
 
-#define REPTYR_VERSION "0.6.2"
+static struct ptrace_personality arch_personality[1] = {
+    {
+        offsetof(struct reg, r_eax),
+        offsetof(struct reg, r_ebx),
+        offsetof(struct reg, r_ecx),
+        offsetof(struct reg, r_edx),
+        offsetof(struct reg, r_esi),
+        offsetof(struct reg, r_edi),
+        offsetof(struct reg, r_ebp),
+        offsetof(struct reg, r_eip),
+    }
+};
 
-#define assert_nonzero(expr) ({                         \
-            typeof(expr) __val = expr;                  \
-            if (__val == 0)                             \
-                die("Unexpected: %s == 0!\n", #expr);   \
-            __val;                                      \
-        })
-
-int attach_child(pid_t pid, const char *pty, int force_stdio);
-int steal_pty(pid_t pid, int *pty);
-#define __printf __attribute__((format(printf, 1, 2)))
-void __printf die(const char *msg, ...) __attribute__((noreturn));
-void __printf debug(const char *msg, ...);
-void __printf error(const char *msg, ...);
+struct x86_personality x86_personality[1] = {
+    {
+        offsetof(struct reg, r_eax),
+    }
+};

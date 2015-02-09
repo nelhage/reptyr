@@ -1,0 +1,7 @@
+script: make test
+env:
+  - CFLAGS=-m32 LDFLAGS=-m32 DISABLE_TESTS=1
+  - CFLAGS=-m64 LDFLAGS=-m64
+before_install:
+  - sudo apt-get update
+  - sudo apt-get -y install gcc-multilib python-pexpect

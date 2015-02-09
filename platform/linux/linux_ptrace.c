@@ -19,22 +19,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <sys/ptrace.h>
-#include <asm/ptrace.h>
-#include <sys/types.h>
-#include <sys/user.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/syscall.h>
-#include <sys/mman.h>
-#include <assert.h>
-#include <stddef.h>
 
-#include "ptrace.h"
+#ifdef __linux__
+
+#include "../../ptrace.h"
+#include "../platform.h"
 
 /*
  * RHEL 5's kernel supports these flags, but their libc doesn't ship a ptrace.h
@@ -107,7 +96,7 @@ struct syscall_numbers *ptrace_syscall_numbers(struct ptrace_child *child) {
 }
 
 int ptrace_attach_child(struct ptrace_child *child, pid_t pid) {
-    memset(child, 0, sizeof *child);
+    memset(child, 0, sizeof * child);
     child->pid = pid;
     if (ptrace_command(child, PTRACE_ATTACH) < 0)
         return -1;
@@ -116,7 +105,7 @@ int ptrace_attach_child(struct ptrace_child *child, pid_t pid) {
 }
 
 int ptrace_finish_attach(struct ptrace_child *child, pid_t pid) {
-    memset(child, 0, sizeof *child);
+    memset(child, 0, sizeof * child);
     child->pid = pid;
 
     kill(pid, SIGCONT);
@@ -127,12 +116,12 @@ int ptrace_finish_attach(struct ptrace_child *child, pid_t pid) {
         goto detach;
 
     if (ptrace_command(child, PTRACE_SETOPTIONS, 0,
-                       PTRACE_O_TRACESYSGOOD|PTRACE_O_TRACEFORK) < 0)
+                       PTRACE_O_TRACESYSGOOD | PTRACE_O_TRACEFORK) < 0)
         goto detach;
 
     return 0;
 
- detach:
+detach:
     /* Don't clobber child->error */
     ptrace(PTRACE_DETACH, child->pid, 0, 0);
     return -1;
@@ -156,7 +145,7 @@ int ptrace_wait(struct ptrace_child *child) {
         int sig = WSTOPSIG(child->status);
         if (sig & 0x80) {
             child->state = (child->state == ptrace_at_syscall) ?
-                ptrace_after_syscall : ptrace_at_syscall;
+                           ptrace_after_syscall : ptrace_at_syscall;
         } else {
             if (sig == SIGTRAP && (((child->status >> 8) & PTRACE_EVENT_FORK) == PTRACE_EVENT_FORK))
                 ptrace_command(child, PTRACE_GETEVENTMSG, 0, &child->forked_pid);
@@ -174,7 +163,7 @@ int ptrace_advance_to_state(struct ptrace_child *child,
                             enum child_state desired) {
     int err;
     while (child->state != desired) {
-        switch(desired) {
+        switch (desired) {
         case ptrace_after_syscall:
         case ptrace_at_syscall:
             if (WIFSTOPPED(child->status) && WSTOPSIG(child->status) == SIGSEGV) {
@@ -258,7 +247,7 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
     setreg(reg_ip, *(unsigned long*)((void*)&child->user +
                                      personality(child)->reg_ip));
 
-    #undef setreg
+#undef setreg
 
     return rv;
 }
@@ -290,7 +279,7 @@ int ptrace_memcpy_from_child(struct ptrace_child *child, void *dst, child_addr_t
     unsigned long scratch;
 
     while (n) {
-         scratch = ptrace_command(child, PTRACE_PEEKDATA, src);
+        scratch = ptrace_command(child, PTRACE_PEEKDATA, src);
         if (child->error) return -1;
         memcpy(dst, &scratch, min(n, sizeof(unsigned long)));
 
@@ -329,8 +318,8 @@ int main(int argc, char **argv) {
     assert(!ptrace_save_regs(&child));
 
     printf("mmap = %lx\n", ptrace_remote_syscall(&child, mmap_syscall, 0,
-                                                 4096, PROT_READ|PROT_WRITE,
-                                                 MAP_ANONYMOUS|MAP_PRIVATE, 0, 0));
+            4096, PROT_READ | PROT_WRITE,
+            MAP_ANONYMOUS | MAP_PRIVATE, 0, 0));
 
     reset_user_struct(&child.user);
     assert(!ptrace_restore_regs(&child));
@@ -338,4 +327,6 @@ int main(int argc, char **argv) {
 
     return 0;
 }
+#endif
+
 #endif

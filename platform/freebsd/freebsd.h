@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 by Nelson Elhage
+ * Copyright (C) 2014 Christian Heckendorf <heckendorfc@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -20,18 +20,32 @@
  * THE SOFTWARE.
  */
 
-#define REPTYR_VERSION "0.6.2"
+#ifndef FREEBSD_H
+#define FREEBSD_H
 
-#define assert_nonzero(expr) ({                         \
-            typeof(expr) __val = expr;                  \
-            if (__val == 0)                             \
-                die("Unexpected: %s == 0!\n", #expr);   \
-            __val;                                      \
-        })
+#ifdef __FreeBSD__
 
-int attach_child(pid_t pid, const char *pty, int force_stdio);
-int steal_pty(pid_t pid, int *pty);
-#define __printf __attribute__((format(printf, 1, 2)))
-void __printf die(const char *msg, ...) __attribute__((noreturn));
-void __printf debug(const char *msg, ...);
-void __printf error(const char *msg, ...);
+#include <stdlib.h>
+#include <kvm.h>
+#include <sys/param.h>
+#include <sys/sysctl.h>
+#include <sys/user.h>
+#include <unistd.h>
+#include <libprocstat.h>
+#include <limits.h>
+#include <fcntl.h>
+#include <termios.h>
+#include <sys/un.h>
+#include <stdio.h>
+#include <string.h>
+
+#define do_socketcall(child, name, a0, a1, a2, a3, a4)                  \
+    ({                                                                  \
+        int __ret=-1;                                                      \
+        if (ptrace_syscall_numbers((child))->nr_##name) {               \
+            __ret = do_syscall((child), name, a0, a1, a2, a3, a4, 0);   \
+        }                                                               \
+        __ret; })
+
+#endif
+#endif

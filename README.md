@@ -80,8 +80,9 @@ How does it work?
 
 The main thing that reptyr does that no one else does is that it
 actually changes the controlling terminal of the process you are
-attaching. I plan on writing up more about just how this works soon,
-but for now, the source is only about 1000 lines if you're curious :)
+attaching. I wrote a
+[blog post](https://blog.nelhage.com/2011/02/changing-ctty/)
+explaining just what the shenanigans involved are.
 
 PRONUNCIATION
 -------------

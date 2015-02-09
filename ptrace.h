@@ -19,9 +19,31 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#ifndef PTRACE_H
+#define PTRACE_H
+
 #include <sys/ptrace.h>
+#include <sys/types.h>
 #include <sys/user.h>
 #include <unistd.h>
+
+/*
+ * See https://github.com/nelhage/reptyr/issues/25 and
+ * https://github.com/nelhage/reptyr/issues/26.
+ *
+ * Older glibc's don't define PTRACE_{SETOPTIONS,GETEVENTMSG}, (but do
+ * in linux/ptrace.h), but on newer systems sys/ptrace.h and
+ * linux/ptrace.h conflict. If we were using autoconf or something, we
+ * could potentially detect the right headers at configure-time, but
+ * I'd like to avoid adding autoconf. These numbers can't ever change
+ * for ABI-compatibility reasons, at least.
+ */
+#ifndef PTRACE_SETOPTIONS
+#define PTRACE_SETOPTIONS   0x4200
+#endif
+#ifndef PTRACE_GETEVENTMSG
+#define PTRACE_GETEVENTMSG  0x4201
+#endif
 
 enum child_state {
     ptrace_detached = 0,
@@ -39,8 +61,13 @@ struct ptrace_child {
     int status;
     int error;
     unsigned long forked_pid;
-    struct user user;
     unsigned long saved_syscall;
+#ifdef __linux__
+	struct user user;
+#endif
+#ifdef __FreeBSD__
+	struct reg regs;
+#endif
 };
 
 struct syscall_numbers {
@@ -58,6 +85,10 @@ struct syscall_numbers {
     long nr_close;
     long nr_ioctl;
     long nr_dup2;
+    long nr_socket;
+    long nr_connect;
+    long nr_sendmsg;
+    long nr_socketcall;
 };
 
 typedef unsigned long child_addr_t;
@@ -80,3 +111,5 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
 int ptrace_memcpy_to_child(struct ptrace_child *, child_addr_t, const void*, size_t);
 int ptrace_memcpy_from_child(struct ptrace_child *, void*, child_addr_t, size_t);
 struct syscall_numbers *ptrace_syscall_numbers(struct ptrace_child *child);
+
+#endif

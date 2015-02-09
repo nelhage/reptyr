@@ -45,6 +45,27 @@ the shell without doing so.
 
 .SH OPTIONS
 
+.B \-T
+.IP
+Use an alternate mode of attaching, "TTY-stealing". In this mode,
+.B reptyr
+will not
+.BR ptrace (2)
+the target process, but will attempt to discover the terminal emulator
+for that process' pty, and steal the master end of the pty. This mode
+is more reliable and flexible in many circumstances (for instance, it
+can attach all processes on a tty, rather than just a single
+process). However, as a downside, children of
+.BR sshd(8)
+cannot be attached via
+.B -T
+unless
+.B reptyr
+is run as root. See
+.URL https://blog.nelhage.com/2014/08/new-reptyr-feature-tty-stealing/
+for more information about tty-stealing.
+.LP
+
 .B \-l, \-L [COMMAND [ARGS]]
 .IP
 Instead of attaching to a new process, create a new pty pair, proxy the master

@@ -76,11 +76,12 @@ struct syscall_numbers arch_syscall_numbers[2] = {
         .nr_fork    = 2,
         .nr_wait4   = 114,
         .nr_signal  = 48,
-        .nr_rt_sigaction = 173,
+        .nr_rt_sigaction = 174,
         .nr_open    = 5,
         .nr_close   = 6,
         .nr_ioctl   = 54,
-        .nr_dup2    = 63
+        .nr_dup2    = 63,
+        .nr_socketcall = 102,
     }
 };
 
