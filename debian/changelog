@@ -1,3 +1,9 @@
+reptyr (0.6.2-1) UNRELEASED; urgency=low
+
+  * New release
+
+ -- Evan Broder <evan@ebroder.net>  Sun, 08 Feb 2015 14:01:13 -1000
+
 reptyr (0.5-1) unstable; urgency=low
 
   * New release (Closes: #711020):
