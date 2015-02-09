@@ -3,7 +3,7 @@ Section: misc
 Priority: optional
 Maintainer: Evan Broder <evan@ebroder.net>
 Build-Depends: debhelper (>= 7.0.50~), dpkg-dev (>= 1.16.1~)
-Standards-Version: 3.9.4
+Standards-Version: 3.9.6
 Homepage: https://github.com/nelhage/reptyr
 Vcs-Git: git://github.com/nelhage/reptyr.git -b debian
 Vcs-Browser: http://github.com/nelhage/reptyr/tree/debian
