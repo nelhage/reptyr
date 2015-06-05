@@ -39,9 +39,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#define do_socketcall(child, name, a0, a1, a2, a3, a4)                  \
+#define do_socketcall(child, scratch, name, a0, a1, a2, a3, a4)         \
     ({                                                                  \
-        int __ret=-1;                                                      \
+        int __ret=-1;                                                   \
         if (ptrace_syscall_numbers((child))->nr_##name) {               \
             __ret = do_syscall((child), name, a0, a1, a2, a3, a4, 0);   \
         }                                                               \
