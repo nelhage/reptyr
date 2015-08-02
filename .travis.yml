@@ -1,10 +1,15 @@
 script: make test
 sudo: false
+language: python
+python:
+  - "2.7"
+install:
+  - env -u CFLAGS -u LDFLAGS pip install -r test/requirements.txt
 addons:
   apt:
     packages:
       - gcc-multilib
-      - python-pexpect
+      - libcap-dev
 env:
   - CFLAGS=-m32 LDFLAGS=-m32 DISABLE_TESTS=1
   - CFLAGS=-m64 LDFLAGS=-m64
