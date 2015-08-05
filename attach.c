@@ -237,6 +237,16 @@ out:
     return err;
 }
 
+int preflight_check(pid_t pid) {
+    struct ptrace_child child;
+    debug("Making sure we have permission to attach...");
+    if (ptrace_attach_child(&child, pid)) {
+        return child.error;
+    }
+    ptrace_detach_child(&child);
+    return 0;
+}
+
 int attach_child(pid_t pid, const char *pty, int force_stdio) {
     struct ptrace_child child;
     child_addr_t scratch_page = -1;
@@ -249,6 +259,10 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
 #endif
 
     if ((err = check_pgroup(pid))) {
+        return err;
+    }
+
+    if ((err = preflight_check(pid))) {
         return err;
     }
 
@@ -531,6 +545,9 @@ int steal_pty(pid_t pid, int *pty) {
     int err = 0;
     struct steal_pty_state steal = {};
     long page_size = sysconf(_SC_PAGE_SIZE);
+
+    if ((err = preflight_check(pid)))
+        goto out;
 
     if ((err = get_terminal_state(&steal, pid)))
         goto out;
