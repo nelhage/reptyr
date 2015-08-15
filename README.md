@@ -41,11 +41,16 @@ accomplishes this.
 PORTABILITY
 -----------
 
-reptyr is Linux-only. It uses ptrace to attach to the target and control it at
-the syscall level, so it is highly dependent on Linux's particular syscall API,
-syscalls, and terminal ioctl()s. A port to Solaris or BSD may be technically
-feasible, but would probably require significant re-architecting to abstract out
-the platform-specific bits.
+reptyr supports Linux and FreeBSD. Not all functionality is currently
+available on FreeBSD. (Notably, FreeBSD doesn't support `reptyr -T` at
+this time.
+
+`reptyr` uses ptrace to attach to the target and control it at the
+syscall level, so it is highly dependent on details of the syscall
+API, available syscalls, and terminal ioctl()s. A port to other
+operating systems may be technically feasible, but requires
+significant low-level knowledge of the relevant platform, and may
+entail significant refactors.
 
 reptyr works on i386, x86_64, and ARM. Ports to other architectures should be
 straightforward, and should in most cases be as simple as adding an arch/ARCH.h
