@@ -498,7 +498,7 @@ int steal_child_pty(struct steal_pty_state *steal) {
 // it doesn't die.
 int steal_block_hup(struct steal_pty_state *steal) {
     struct ptrace_child leader;
-    child_addr_t scratch;
+    child_addr_t scratch = 0;
     int err = 0;
 
     if ((err = grab_pid(steal->target_stat.sid, &leader, &scratch)))
