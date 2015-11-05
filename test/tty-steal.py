@@ -4,7 +4,7 @@ import os
 import sys
 
 if os.getenv("NO_TEST_STEAL") is not None:
-    print "Skipping tty-stealing tests because $NO_TEST_STEAL is set."
+    print("Skipping tty-stealing tests because $NO_TEST_STEAL is set.")
     sys.exit(0)
 
 PR_SET_PTRACER_ANY = 0xffffffff
