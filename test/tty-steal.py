@@ -9,7 +9,8 @@ if os.getenv("NO_TEST_STEAL") is not None:
 import prctl
 
 PR_SET_PTRACER_ANY = 0xffffffff
-prctl.set_ptracer(PR_SET_PTRACER_ANY)
+if hasattr(prctl, 'set_ptracer'):
+    prctl.set_ptracer(PR_SET_PTRACER_ANY)
 
 child = pexpect.spawn("test/victim")
 child.setecho(False)
