@@ -1,4 +1,7 @@
-override CFLAGS+=-Wall -Werror -D_GNU_SOURCE -g
+# Our `cmsg` usage in attach.c is not
+# `-fstrict-aliasing`-compatible. Just disable it, since the
+# workaround is a pain.
+override CFLAGS+=-Wall -Werror -D_GNU_SOURCE -g -fno-strict-aliasing
 OBJS=reptyr.o reallocarray.o attach.o
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
