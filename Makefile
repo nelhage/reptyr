@@ -1,4 +1,4 @@
-override CFLAGS+=-Wall -Werror -D_GNU_SOURCE -g
+override CFLAGS := -Wall -Werror -D_GNU_SOURCE -g $(CFLAGS)
 OBJS=reptyr.o reallocarray.o attach.o
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
