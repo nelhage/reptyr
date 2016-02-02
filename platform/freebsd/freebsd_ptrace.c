@@ -47,7 +47,7 @@
 static int __ptrace_command(struct ptrace_child *child, int req,
                             void *, int);
 
-#define ptrace_command(cld, req, ...) _ptrace_command(cld, req, ## __VA_ARGS__, NULL, NULL)
+#define ptrace_command(cld, req, ...) _ptrace_command(cld, req, ## __VA_ARGS__, 0, 0)
 #define _ptrace_command(cld, req, addr, data, ...) __ptrace_command((cld), (req), (void*)(addr), (int)(data))
 
 
