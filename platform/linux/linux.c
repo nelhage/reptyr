@@ -148,7 +148,7 @@ int check_pgroup(pid_t target) {
                 memcpy(pid_stat.comm, "???", 4);
             }
             error("Process %d (%.*s) shares %d's process group. Unable to attach.\n"
-                  "(This most commonly means that %d has suprocesses).",
+                  "(This most commonly means that %d has sub-processes).",
                   (int)pid, TASK_COMM_LENGTH, pid_stat.comm, (int)target, (int)target);
             err = EINVAL;
             goto out;
