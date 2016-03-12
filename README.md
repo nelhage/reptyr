@@ -21,6 +21,21 @@ background it, you will still have to run "bg" or "fg" in the old
 terminal. This is likely impossible to fix in a reasonable way without
 patching your shell.)
 
+Typical usage pattern
+---------------------
+
+* Start a long running process, e.g. `top`
+* Background the process with CTRL-Z
+* Resume the process in the background: `bg`
+* Display your running background jobs with `jobs -l`, this should look like this:
+  * `[1]+  4711 Stopped (signal)        top`
+  * (The `-l` in `jobs -l` makes sure you'll get the PID)
+* Disown the jobs from the current parent with `disown top`. After that, `jobs` will not show the job any more, but `ps -a` will.
+* Start your terminal multiplexer of choice, e.g. `tmux`
+* Reattach to the backgrounded process: `reptyr 4711`
+* Detach your terminal multiplexer (e.g. CTRL-A D) and close ssh
+* Reconnect ssh, attach to your multiplexer (e.g. `tmux attach`), rejoice!
+
 "But wait, isn't this just screenify?"
 --------------------------------------
 
