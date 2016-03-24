@@ -65,7 +65,7 @@ struct syscall_numbers arch_syscall_numbers[2] = {
          * include unistd_32.h, but those definitions would conflict with the
          * standard ones. So, let's just hardcode the values for now. Probably
          * we should generate this from unistd_32.h during the build process or
-         * soemthing.
+         * something.
          */
         .nr_mmap    = 90,
         .nr_mmap2   = 192,
