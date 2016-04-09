@@ -129,9 +129,9 @@ void do_proxy(int pty) {
         if (winch_happened) {
             winch_happened = 0;
             /*
-             * FIXME: If a signal comes in after this point but before
-             * select(), the resize will be delayed until we get more
-             * input. signalfd() is probably the cleanest solution.
+             * minor race: If a signal comes in after this point but
+             * before select(), the resize will be delayed until we
+             * get more input. signalfd() or pselect() could fix this.
              */
             resize_pty(pty);
         }
