@@ -8,7 +8,7 @@ ifeq ($(UNAME_S),FreeBSD)
 	OBJS += platform/freebsd/freebsd_ptrace.o platform/freebsd/freebsd.o
 	LDFLAGS += -lprocstat
 endif
-# Note that because of how Make works, this can be overriden from the
+# Note that because of how Make works, this can be overridden from the
 # command-line.
 #
 # e.g. install to /usr with `make PREFIX=/usr`
