@@ -398,9 +398,9 @@ int setup_steal_socket(struct steal_pty_state *steal) {
     if (bind(steal->sockfd, &steal->addr, sizeof(steal->addr_un)) < 0)
         return errno;
 
-    if (chown(steal->addr_un.sun_path, steal->target_stat.uid, steal->target_stat.gid) < 0)
+    if (chown(steal->addr_un.sun_path, steal->emulator_uid, -1) < 0)
         debug("chown %s: %s", steal->addr_un.sun_path, strerror(errno));
-    if (chown(steal->tmpdir, steal->target_stat.uid, steal->target_stat.gid) < 0)
+    if (chown(steal->tmpdir, steal->emulator_uid, -1) < 0)
         debug("chown %s: %s", steal->tmpdir, strerror(errno));
 
     return 0;

@@ -46,13 +46,6 @@ int parse_proc_stat(int statfd, struct proc_stat *out) {
     }
     out->ctty = dev;
 
-    struct stat st;
-    if (fstat(statfd, &st) != 0)
-        return assert_nonzero(errno);
-
-    out->uid = st.st_uid;
-    out->gid = st.st_gid;
-
     return 0;
 }
 
@@ -67,8 +60,51 @@ int read_proc_stat(pid_t pid, struct proc_stat *out) {
         error("Unable to open %s: %s", stat_path, strerror(errno));
         return -statfd;
     }
-
     err = parse_proc_stat(statfd, out);
+
+
+    close(statfd);
+    return err;
+}
+
+int read_uid(pid_t pid, uid_t *out) {
+    char stat_path[PATH_MAX];
+    char buf[1024];
+    int statfd;
+    int err = 0;
+    int n;
+    char *p = buf;
+
+    snprintf(stat_path, sizeof stat_path, "/proc/%d/status", pid);
+    statfd = open(stat_path, O_RDONLY);
+    if (statfd < 0) {
+        error("Unable to open %s: %s", stat_path, strerror(errno));
+        return -statfd;
+    }
+
+    if ((n = read(statfd, buf, sizeof(buf))) < 0) {
+        err = assert_nonzero(errno);
+        goto out;
+    }
+    while (p < buf + n) {
+        if (strncmp(p, "Uid:\t", strlen("Uid:\t")) == 0)
+            break;
+        p = memchr(p, '\n', buf+n-p);
+        if (p == NULL)
+            break;
+        p++;
+        continue;
+    }
+    if (p == NULL || p >= buf + n) {
+        debug("Unable to parse emulator uid: no Uid line found");
+        *out = -1;
+        goto out;
+    }
+    if(sscanf(p, "Uid:\t%d", out) < 0) {
+        debug("Unable to parse emulator uid: unparseable Uid line");
+    }
+
+ out:
     close(statfd);
     return err;
 }
@@ -235,6 +271,9 @@ int get_terminal_state(struct steal_pty_state *steal, pid_t target) {
     }
 
     if ((err = find_terminal_emulator(steal)))
+        return err;
+
+    if ((err = read_uid(steal->emulator_pid, &steal->emulator_uid)))
         return err;
 
     return 0;

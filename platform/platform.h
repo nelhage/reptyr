@@ -45,14 +45,14 @@ struct proc_stat {
     char state;
     pid_t ppid, sid, pgid;
     dev_t ctty;
-    uid_t uid;
-    gid_t gid;
 };
 
 struct steal_pty_state {
     struct proc_stat target_stat;
 
     pid_t emulator_pid;
+    uid_t emulator_uid;
+
     struct fd_array master_fds;
 
     char tmpdir[PATH_MAX];
