@@ -47,8 +47,13 @@
 	typeof(y) _min2 = (y);			\
 	_min1 < _min2 ? _min1 : _min2; })
 
+#ifdef PTRACE_TRACEME
+static long __ptrace_command(struct ptrace_child *child, int req,
+                             void *, void*);
+#else
 static long __ptrace_command(struct ptrace_child *child, enum __ptrace_request req,
                              void *, void*);
+#endif
 
 #define ptrace_command(cld, req, ...) _ptrace_command(cld, req, ## __VA_ARGS__, NULL, NULL)
 #define _ptrace_command(cld, req, addr, data, ...) __ptrace_command((cld), (req), (void*)(addr), (void*)(data))
@@ -293,8 +298,13 @@ int ptrace_memcpy_from_child(struct ptrace_child *child, void *dst, child_addr_t
     return 0;
 }
 
+#ifdef PTRACE_TRACEME
+static long __ptrace_command(struct ptrace_child *child, int req,
+                             void *addr, void *data) {
+#else
 static long __ptrace_command(struct ptrace_child *child, enum __ptrace_request req,
                              void *addr, void *data) {
+#endif
     long rv;
     errno = 0;
     rv = ptrace(req, child->pid, addr, data);
