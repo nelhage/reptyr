@@ -228,9 +228,10 @@ int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
     }
 
     if (stat("/dev/console", &console_st) < 0) {
-        child->error = errno;
         error("Unable to stat /dev/console");
-        return NULL;
+        console_st = (struct stat){
+            .st_rdev = -1,
+        };
     }
 
     snprintf(buf, sizeof buf, "/proc/%d/fd/", child->pid);
