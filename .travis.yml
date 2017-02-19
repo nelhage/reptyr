@@ -1,15 +1,20 @@
 script: make test
-sudo: false
+sudo: true
+dist: trusty
 language: python
 python:
   - "2.7"
 install:
+  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+  - sudo apt-get update
+  - sudo apt-get install gcc-7
   - env -u CFLAGS -u LDFLAGS pip install -r test/requirements.txt
 addons:
   apt:
+    sources:
+      - ubuntu-toolchain-r-test
     packages:
       - gcc-multilib
       - libcap-dev
 env:
-  - CFLAGS=-m32 LDFLAGS=-m32 DISABLE_TESTS=1
-  - CFLAGS=-m64 LDFLAGS=-m64
+  - CFLAGS=-m64 LDFLAGS=-m64 CC=gcc-7
