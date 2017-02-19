@@ -40,6 +40,7 @@
 #include <sys/ptrace.h>
 #include <asm/ptrace.h>
 #include <sys/types.h>
+#include <sys/sysmacros.h>
 #include <sys/user.h>
 #include <unistd.h>
 #include <stdlib.h>
