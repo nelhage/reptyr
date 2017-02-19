@@ -389,8 +389,11 @@ int setup_steal_socket(struct steal_pty_state *steal) {
         return errno;
 
     steal->addr_un.sun_family = AF_UNIX;
-    snprintf(steal->addr_un.sun_path, sizeof(steal->addr_un.sun_path),
-             "%s/reptyr.sock", steal->tmpdir);
+    if (snprintf(steal->addr_un.sun_path, sizeof(steal->addr_un.sun_path),
+                 "%s/reptyr.sock", steal->tmpdir) >= sizeof(steal->addr_un.sun_path)) {
+        error("tmpdir path too long!");
+        return ENAMETOOLONG;
+    }
 
     if ((steal->sockfd = socket(AF_UNIX, SOCK_DGRAM, 0)) < 0)
         return errno;
