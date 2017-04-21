@@ -76,12 +76,17 @@ ptrace_scope on Ubuntu Maverick and up
 
 `reptyr` depends on the `ptrace` system call to attach to the remote program. On
 Ubuntu Maverick and higher, this ability is disabled by default for security
-reasons. You can enable it temporarily by doing
+reasons. You can enable it temporarily (system-wide!) by doing
 
     # echo 0 > /proc/sys/kernel/yama/ptrace_scope
 
 as root, or permanently by editing the file /etc/sysctl.d/10-ptrace.conf, which
 also contains more information about exactly what this setting accomplishes.
+
+A better approach is to grant the required capability to the reptyr binary
+only (it will get attached to the binary via extended attributes):
+
+    sudo setcap cap_sys_ptrace=eip /usr/bin/reptyr
 
 reptyr -l
 ---------
