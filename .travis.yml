@@ -9,7 +9,13 @@ addons:
   apt:
     packages:
       - gcc-multilib
+      - gcc-4.4-multilib
+      - gcc-4.5-multilib
       - libcap-dev
 env:
   - CFLAGS=-m32 LDFLAGS=-m32 DISABLE_TESTS=1
   - CFLAGS=-m64 LDFLAGS=-m64
+  - CC=gcc-4.4 CFLAGS=-m32 LDFLAGS=-m32 DISABLE_TESTS=1
+  - CC=gcc-4.4 CFLAGS=-m64 LDFLAGS=-m64
+  - CC=gcc-4.5 CFLAGS=-m32 LDFLAGS=-m32 DISABLE_TESTS=1
+  - CC=gcc-4.5 CFLAGS=-m64 LDFLAGS=-m64
