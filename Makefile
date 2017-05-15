@@ -48,6 +48,7 @@ BASHCOMPDIR ?= $(shell $(PKG_CONFIG) --variable=completionsdir bash-completion 2
 install: reptyr
 	install -d -m 755 $(DESTDIR)$(BINDIR)
 	install -m 755 reptyr $(DESTDIR)$(BINDIR)/reptyr
+	setcap cap_sys_ptrace=eip $(DESTDIR)$(BINDIR)/reptyr
 	install -d -m 755 $(DESTDIR)$(MANDIR)/man1
 	install -m 644 reptyr.1 $(DESTDIR)$(MANDIR)/man1/reptyr.1
 	install -d -m 755 $(DESTDIR)$(MANDIR)/fr/man1
