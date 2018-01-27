@@ -1,2 +1,3 @@
 version=3
-http://githubredir.debian.net/github/nelhage/reptyr/reptyr-(.*).tar.gz
+opts=uversionmangle=s/(\d+)-(\d+)-(\d+)/$1.$2.$3/ \
+https://github.com/nelhage/reptyr/releases .*/archive/reptyr-([\d.-]+)\.tar\.gz
