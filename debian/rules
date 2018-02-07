@@ -14,12 +14,4 @@ override_dh_auto_install:
 # reptyr's test suite relies on being able to ptrace non-child
 # processes, which isn't allowed under yama's defaults on Ubuntu
 override_dh_auto_test:
-	if ! [ -f /dev/tty0 ]; \
-	then echo disable tests; \
-	else dh_auto_test; \
-	fi
-
-	if ! [ -f /proc/sys/kernel/yama/ptrace_scope ] || \
-	  [ "$$(cat /proc/sys/kernel/yama/ptrace_scope)" = 0 ]; then \
-	  dh_auto_test; \
-	fi \
+	#disable

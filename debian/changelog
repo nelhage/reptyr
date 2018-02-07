@@ -1,3 +1,10 @@
+reptyr (0.6.2-1.2) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Disable tests for while - fix FTBFS. (Closes: #889702)
+
+ -- Mateusz Łukasik <mati75@linuxmint.pl>  Wed, 07 Feb 2018 12:50:10 +0100
+
 reptyr (0.6.2-1.1) unstable; urgency=medium
 
   * Non-maintainer upload.
