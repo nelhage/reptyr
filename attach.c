@@ -559,6 +559,7 @@ int steal_pty(pid_t pid, int *pty) {
         goto out;
 
     debug("Listening on socket: %s", steal.addr_un.sun_path);
+    debug("Attaching terminal emulator pid=%d", steal.emulator_pid);
 
     if ((err = grab_pid(steal.emulator_pid, &steal.child, &steal.child_scratch)))
         goto out;
