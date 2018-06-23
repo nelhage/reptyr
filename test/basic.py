@@ -2,6 +2,7 @@ import pexpect
 import sys
 
 child = pexpect.spawn("test/victim")
+child.logfile = sys.stdout
 child.setecho(False)
 child.sendline("hello")
 child.expect("ECHO: hello")
