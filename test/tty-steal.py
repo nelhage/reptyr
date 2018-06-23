@@ -6,13 +6,18 @@ if os.getenv("NO_TEST_STEAL") is not None:
     print("Skipping tty-stealing tests because $NO_TEST_STEAL is set.")
     sys.exit(0)
 
+did_prctl = False
 try:
     import prctl
     PR_SET_PTRACER_ANY = 0xffffffff
     if hasattr(prctl, 'set_ptracer'):
+        did_prctl = True
         prctl.set_ptracer(PR_SET_PTRACER_ANY)
 except ImportError:
-    print("Unable to import `prctl`, skipping `PR_SET_PTRACER`.")
+    pass
+
+if not did_prctl:
+  print("Unable to find `prctl.set_ptracer`, skipping `PR_SET_PTRACER`.")
 
 child = pexpect.spawn("test/victim")
 child.setecho(False)
