@@ -1,5 +1,5 @@
 script: make test
-sudo: false
+sudo: required
 language: python
 python:
   - "2.7"
