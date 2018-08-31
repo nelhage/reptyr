@@ -51,5 +51,5 @@ static inline int arch_save_syscall(struct ptrace_child *child) {
 }
 
 static inline int arch_restore_syscall(struct ptrace_child *child) {
-    return 0;
+    return arch_set_syscall(child, child->saved_syscall);
 }
