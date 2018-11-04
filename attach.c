@@ -109,8 +109,8 @@ int do_setsid(struct ptrace_child *child) {
 
 out_kill:
     kill(dummy.pid, SIGKILL);
+    ptrace_wait(&dummy);
     ptrace_detach_child(&dummy);
-    //ptrace_wait(&dummy);
     do_syscall(child, wait4, dummy.pid, 0, WNOHANG, 0, 0, 0);
     return err;
 }
