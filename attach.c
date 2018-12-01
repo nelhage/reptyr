@@ -69,11 +69,19 @@ static void do_unmap(struct ptrace_child *child, child_addr_t addr, unsigned lon
     do_syscall(child, munmap, (unsigned long)addr, len, 0, 0, 0, 0);
 }
 
+static int do_fork(struct ptrace_child *child) {
+    if (ptrace_syscall_numbers(child)->nr_fork != -1) {
+        return do_syscall(child, fork, 0, 0, 0, 0, 0, 0);
+    } else {
+        return do_syscall(child, clone, SIGCHLD, 0, 0, 0, 0, 0);
+    }
+}
+
 int do_setsid(struct ptrace_child *child) {
     int err = 0;
     struct ptrace_child dummy;
 
-    err = do_syscall(child, fork, 0, 0, 0, 0, 0, 0);
+    err = do_fork(child);
     if (err < 0)
         return err;
 
@@ -113,6 +121,21 @@ out_kill:
     ptrace_detach_child(&dummy);
     do_syscall(child, wait4, dummy.pid, 0, WNOHANG, 0, 0, 0);
     return err;
+}
+
+static int do_dup2(struct ptrace_child *child, int oldfd, int newfd) {
+    if (ptrace_syscall_numbers(child)->nr_dup2 != -1) {
+        return do_syscall(child, dup2, oldfd, newfd, 0, 0, 0, 0);
+    } else {
+        int err = do_syscall(child, dup3, oldfd, newfd, 0, 0, 0, 0);
+        // dup3 returns EINVAL when the fds are the same, while dup2 ignores it
+        if (child->error == EINVAL){
+            child->error = 0;
+            return 0;
+        } else {
+            return err;
+        }
+    }
 }
 
 int ignore_hup(struct ptrace_child *child, child_addr_t scratch_page) {
@@ -316,9 +339,9 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
         goto out_free_fds;
     }
 
-    child_fd = do_syscall(&child, open,
-                          scratch_page, O_RDWR | O_NOCTTY,
-                          0, 0, 0, 0);
+    child_fd = do_syscall(&child, openat,
+                          -1, scratch_page, O_RDWR | O_NOCTTY,
+                          0, 0, 0);
     if (child_fd < 0) {
         err = child_fd;
         error("Unable to open the tty in the child.");
@@ -350,7 +373,7 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
     debug("Set the controlling tty");
 
     for (i = 0; i < n_fds; i++) {
-        err = do_syscall(&child, dup2, child_fd, child_tty_fds[i], 0, 0, 0, 0);
+        err = do_dup2(&child, child_fd, child_tty_fds[i]);
         if (err < 0)
             error("Problem moving child fd number %d to new tty: %s", child_tty_fds[i], strerror(errno));
     }
@@ -522,14 +545,14 @@ int steal_cleanup_child(struct steal_pty_state *steal) {
         return steal->child.error;
     }
 
-    int nullfd = do_syscall(&steal->child, open, steal->child_scratch, O_RDWR, 0, 0, 0, 0);
+    int nullfd = do_syscall(&steal->child, openat, -1, steal->child_scratch, O_RDWR, 0, 0, 0);
     if (nullfd < 0) {
         return steal->child.error;
     }
 
     int i;
     for (i = 0; i < steal->master_fds.n; ++i) {
-        do_syscall(&steal->child, dup2, nullfd, steal->master_fds.fds[i], 0, 0, 0, 0);
+        do_dup2(&steal->child, nullfd, steal->master_fds.fds[i]);
     }
 
     do_syscall(&steal->child, close, nullfd, 0, 0, 0, 0, 0);

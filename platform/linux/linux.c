@@ -402,7 +402,7 @@ void move_process_group(struct ptrace_child *child, pid_t from, pid_t to) {
 }
 
 void copy_user(struct ptrace_child *d, struct ptrace_child *s) {
-    memcpy(&d->user, &s->user, sizeof(s->user));
+    memcpy(&d->regs, &s->regs, sizeof(s->regs));
 }
 
 unsigned long ptrace_socketcall(struct ptrace_child *child,

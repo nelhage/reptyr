@@ -63,9 +63,14 @@ struct ptrace_child {
     unsigned long forked_pid;
     unsigned long saved_syscall;
 #ifdef __linux__
-	struct user user;
+#ifdef __arm__
+    struct user_regs regs;
+#elif defined(__powerpc__)
+    struct pt_regs regs;
+#else
+    struct user_regs_struct regs;
 #endif
-#ifdef __FreeBSD__
+#elif defined(__FreeBSD__)
 	struct reg regs;
 #endif
 };
@@ -78,13 +83,15 @@ struct syscall_numbers {
     long nr_setsid;
     long nr_setpgid;
     long nr_fork;
+    long nr_clone;
     long nr_wait4;
     long nr_signal;
     long nr_rt_sigaction;
-    long nr_open;
+    long nr_openat;
     long nr_close;
     long nr_ioctl;
     long nr_dup2;
+    long nr_dup3;
     long nr_socket;
     long nr_connect;
     long nr_sendmsg;

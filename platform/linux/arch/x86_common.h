@@ -34,10 +34,9 @@ static inline struct x86_personality *x86_pers(struct ptrace_child *child) {
 static inline void arch_fixup_regs(struct ptrace_child *child) {
     struct x86_personality *x86pers = x86_pers(child);
     struct ptrace_personality *pers = personality(child);
-    struct user *user = &child->user;
-#define ptr(user, off) ((unsigned long*)((void*)(user)+(off)))
-    *ptr(user, pers->reg_ip) -= 2;
-    *ptr(user, x86pers->ax) = *ptr(user, x86pers->orig_ax);
+    struct user_regs_struct *regs = &child->regs;
+    *ptr(regs, pers->reg_ip) -= 2;
+    *ptr(regs, x86pers->ax) = *ptr(regs, x86pers->orig_ax);
 }
 
 static inline int arch_set_syscall(struct ptrace_child *child,
@@ -48,12 +47,10 @@ static inline int arch_set_syscall(struct ptrace_child *child,
 }
 
 static inline int arch_save_syscall(struct ptrace_child *child) {
-    child->saved_syscall = *ptr(&child->user, x86_pers(child)->orig_ax);
+    child->saved_syscall = *ptr(&child->regs, x86_pers(child)->orig_ax);
     return 0;
 }
 
 static inline int arch_restore_syscall(struct ptrace_child *child) {
     return 0;
 }
-
-#undef ptr
