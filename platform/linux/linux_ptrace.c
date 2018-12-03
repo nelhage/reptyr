@@ -338,31 +338,4 @@ static long __ptrace_command(struct ptrace_child *child, enum __ptrace_request r
     return rv;
 }
 
-
-#ifdef BUILD_PTRACE_MAIN
-int main(int argc, char **argv) {
-    struct ptrace_child child;
-    pid_t pid;
-
-    if (argc < 2) {
-        printf("Usage: %s pid\n", argv[0]);
-        return 1;
-    }
-    pid = atoi(argv[1]);
-
-    assert(!ptrace_attach_child(&child, pid));
-    assert(!ptrace_save_regs(&child));
-
-    printf("mmap = %lx\n", ptrace_remote_syscall(&child, mmap_syscall, 0,
-            4096, PROT_READ | PROT_WRITE,
-            MAP_ANONYMOUS | MAP_PRIVATE, 0, 0));
-
-    reset_user_struct(&child.regs);
-    assert(!ptrace_restore_regs(&child));
-    assert(!ptrace_detach_child(&child));
-
-    return 0;
-}
-#endif
-
 #endif

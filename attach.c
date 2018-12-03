@@ -124,17 +124,13 @@ out_kill:
 }
 
 static int do_dup2(struct ptrace_child *child, int oldfd, int newfd) {
+    if (oldfd == newfd) {
+        return 0;
+    }
     if (ptrace_syscall_numbers(child)->nr_dup2 != -1) {
         return do_syscall(child, dup2, oldfd, newfd, 0, 0, 0, 0);
     } else {
-        int err = do_syscall(child, dup3, oldfd, newfd, 0, 0, 0, 0);
-        // dup3 returns EINVAL when the fds are the same, while dup2 ignores it
-        if (child->error == EINVAL){
-            child->error = 0;
-            return 0;
-        } else {
-            return err;
-        }
+        return do_syscall(child, dup3, oldfd, newfd, 0, 0, 0, 0);
     }
 }
 
