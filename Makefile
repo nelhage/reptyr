@@ -24,8 +24,8 @@ reptyr: $(OBJS)
 
 ifeq ($(DISABLE_TESTS),)
 test: reptyr test/victim PHONY
-	python test/basic.py
-	python test/tty-steal.py
+	python2 test/basic.py
+	python2 test/tty-steal.py
 else
 test: all
 endif

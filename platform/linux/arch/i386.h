@@ -23,20 +23,20 @@
 
 static struct ptrace_personality arch_personality[1] = {
     {
-        offsetof(struct user, regs.eax),
-        offsetof(struct user, regs.ebx),
-        offsetof(struct user, regs.ecx),
-        offsetof(struct user, regs.edx),
-        offsetof(struct user, regs.esi),
-        offsetof(struct user, regs.edi),
-        offsetof(struct user, regs.ebp),
-        offsetof(struct user, regs.eip),
+        offsetof(struct user_regs_struct, eax),
+        offsetof(struct user_regs_struct, ebx),
+        offsetof(struct user_regs_struct, ecx),
+        offsetof(struct user_regs_struct, edx),
+        offsetof(struct user_regs_struct, esi),
+        offsetof(struct user_regs_struct, edi),
+        offsetof(struct user_regs_struct, ebp),
+        offsetof(struct user_regs_struct, eip),
     }
 };
 
 struct x86_personality x86_personality[1] = {
     {
-        offsetof(struct user, regs.orig_eax),
-        offsetof(struct user, regs.eax),
+        offsetof(struct user_regs_struct, orig_eax),
+        offsetof(struct user_regs_struct, eax),
     }
 };

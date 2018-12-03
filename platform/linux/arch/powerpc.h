@@ -22,22 +22,21 @@
 
 static struct ptrace_personality arch_personality[1] = {
     {
-        offsetof(struct user, regs.gpr[3]),
-        offsetof(struct user, regs.gpr[3]),
-        offsetof(struct user, regs.gpr[4]),
-        offsetof(struct user, regs.gpr[5]),
-        offsetof(struct user, regs.gpr[6]),
-        offsetof(struct user, regs.gpr[7]),
-        offsetof(struct user, regs.gpr[8]),
-        offsetof(struct user, regs.nip),
+        offsetof(struct pt_regs, gpr[3]),
+        offsetof(struct pt_regs, gpr[3]),
+        offsetof(struct pt_regs, gpr[4]),
+        offsetof(struct pt_regs, gpr[5]),
+        offsetof(struct pt_regs, gpr[6]),
+        offsetof(struct pt_regs, gpr[7]),
+        offsetof(struct pt_regs, gpr[8]),
+        offsetof(struct pt_regs, nip),
     }
 };
 
-static const unsigned long r0off = offsetof(struct user, regs.gpr[0]);
-#define ptr(user, off) ((unsigned long*)((void*)(user)+(off)))
+static const unsigned long r0off = offsetof(struct pt_regs, gpr[0]);
 
 static inline void arch_fixup_regs(struct ptrace_child *child) {
-    child->user.regs.nip -= 4;
+    child->regs.nip -= 4;
 }
 
 static inline int arch_set_syscall(struct ptrace_child *child,
@@ -46,7 +45,7 @@ static inline int arch_set_syscall(struct ptrace_child *child,
 }
 
 static inline int arch_save_syscall(struct ptrace_child *child) {
-    child->saved_syscall = *ptr(&child->user, r0off);
+    child->saved_syscall = *ptr(&child->regs, r0off);
     return 0;
 }
 

@@ -22,6 +22,7 @@
 
 #ifdef __linux__
 
+#include <elf.h>
 #include "../../ptrace.h"
 #include "../platform.h"
 
@@ -58,6 +59,7 @@ static long __ptrace_command(struct ptrace_child *child, enum __ptrace_request r
 #define ptrace_command(cld, req, ...) _ptrace_command(cld, req, ## __VA_ARGS__, NULL, NULL)
 #define _ptrace_command(cld, req, addr, data, ...) __ptrace_command((cld), (req), (void*)(addr), (void*)(data))
 
+#define ptr(regs, off) ((unsigned long*)((void*)(regs)+(off)))
 
 struct ptrace_personality {
     size_t syscall_rv;
@@ -78,6 +80,8 @@ static struct ptrace_personality *personality(struct ptrace_child *child);
 #include "arch/i386.h"
 #elif defined(__arm__)
 #include "arch/arm.h"
+#elif defined(__aarch64__)
+#include "arch/aarch64.h"
 #elif defined(__powerpc__)
 #include "arch/powerpc.h"
 #else
@@ -202,7 +206,12 @@ int ptrace_advance_to_state(struct ptrace_child *child,
 int ptrace_save_regs(struct ptrace_child *child) {
     if (ptrace_advance_to_state(child, ptrace_at_syscall) < 0)
         return -1;
-    if (ptrace_command(child, PTRACE_GETREGS, 0, &child->user) < 0)
+
+    struct iovec reg_iovec = {
+        .iov_base = &child->regs,
+        .iov_len = sizeof(child->regs)
+    };
+    if (ptrace_command(child, PTRACE_GETREGSET, NT_PRSTATUS, &reg_iovec) < 0)
         return -1;
     arch_fixup_regs(child);
     if (arch_save_syscall(child) < 0)
@@ -212,7 +221,11 @@ int ptrace_save_regs(struct ptrace_child *child) {
 
 int ptrace_restore_regs(struct ptrace_child *child) {
     int err;
-    err = ptrace_command(child, PTRACE_SETREGS, 0, &child->user);
+    struct iovec reg_iovec = {
+        .iov_base = &child->regs,
+        .iov_len = sizeof(child->regs)
+    };
+    err = ptrace_command(child, PTRACE_SETREGSET, NT_PRSTATUS, &reg_iovec);
     if (err < 0)
         return err;
     return arch_restore_syscall(child);
@@ -227,15 +240,21 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
     if (ptrace_advance_to_state(child, ptrace_at_syscall) < 0)
         return -1;
 
-#define setreg(r, v) do {                                               \
-        if (ptrace_command(child, PTRACE_POKEUSER,                      \
-                           personality(child)->r,                       \
-                           (v)) < 0)                                    \
-            return -1;                                                  \
-    } while (0)
-
     if (arch_set_syscall(child, sysno) < 0)
         return -1;
+
+    typeof(child->regs) regs;
+
+    struct iovec reg_iovec = {
+        .iov_base = &regs,
+        .iov_len = sizeof(regs)
+    };
+
+#define setreg(r, v) (*ptr(&regs, (personality(child)->r))) = (v)
+
+    if (ptrace_command(child, PTRACE_GETREGSET, NT_PRSTATUS, &reg_iovec) < 0)
+        return -1;
+
     setreg(syscall_arg0, p0);
     setreg(syscall_arg1, p1);
     setreg(syscall_arg2, p2);
@@ -243,16 +262,21 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
     setreg(syscall_arg4, p4);
     setreg(syscall_arg5, p5);
 
+    if (ptrace_command(child, PTRACE_SETREGSET, NT_PRSTATUS, &reg_iovec) < 0)
+        return -1;
+
     if (ptrace_advance_to_state(child, ptrace_after_syscall) < 0)
         return -1;
 
-    rv = ptrace_command(child, PTRACE_PEEKUSER,
-                        personality(child)->syscall_rv);
-    if (child->error)
+    if (ptrace_command(child, PTRACE_GETREGSET, NT_PRSTATUS, &reg_iovec) < 0)
         return -1;
 
-    setreg(reg_ip, *(unsigned long*)((void*)&child->user +
-                                     personality(child)->reg_ip));
+    rv = *ptr(&regs, (personality(child)->syscall_rv));
+
+    setreg(reg_ip, *(unsigned long*)((void*)&child->regs + personality(child)->reg_ip));
+
+    if (ptrace_command(child, PTRACE_SETREGSET, NT_PRSTATUS, &reg_iovec) < 0)
+        return -1;
 
 #undef setreg
 
@@ -333,7 +357,7 @@ int main(int argc, char **argv) {
             4096, PROT_READ | PROT_WRITE,
             MAP_ANONYMOUS | MAP_PRIVATE, 0, 0));
 
-    reset_user_struct(&child.user);
+    reset_user_struct(&child.regs);
     assert(!ptrace_restore_regs(&child));
     assert(!ptrace_detach_child(&child));
 
