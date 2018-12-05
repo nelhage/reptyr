@@ -1,3 +1,8 @@
+* 0.7.0 (Dec 05, 2018)
+ - Add bash completion support
+ - Fix compilation with musl libc, CentOS, or GCC 7+
+ - Support for PowerPC and aarch64
+
 * 0.6.2 (Jan 31, 2015)
  - Fix tty-stealing on i386
 
