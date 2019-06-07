@@ -44,6 +44,12 @@
 #ifndef PTRACE_GETEVENTMSG
 #define PTRACE_GETEVENTMSG  0x4201
 #endif
+#ifndef PTRACE_GETREGSET
+#define PTRACE_GETREGSET  0x4204
+#endif
+#ifndef PTRACE_SETREGSET
+#define PTRACE_SETREGSET  0x4205
+#endif
 
 enum child_state {
     ptrace_detached = 0,
