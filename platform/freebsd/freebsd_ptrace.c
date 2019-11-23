@@ -220,6 +220,9 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
                                     unsigned long p0, unsigned long p1,
                                     unsigned long p2, unsigned long p3,
                                     unsigned long p4, unsigned long p5) {
+#ifdef PT_GET_SC_RET
+    struct ptrace_sc_ret psr;
+#endif
     unsigned long rv;
     if (ptrace_advance_to_state(child, ptrace_at_syscall) < 0)
         return -1;
@@ -240,10 +243,28 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
     if (ptrace_advance_to_state(child, ptrace_after_syscall) < 0)
         return -1;
 
+#ifndef PT_GET_SC_RET
+    /*
+     * In case of an error, this is technically incorrect.  FreeBSD, on most
+     * architectures, stores the return value in this register as expected and
+     * sets a separate bit to indicate if this an error or not -- contrary to
+     * the Linux convention of negative values indicating an error, positive
+     * values otherwise.  This should switch to PT_GET_SC_RET unconditionally
+     * as it makes its way into all supported releases.
+     */
     rv = arch_get_register(child, personality(child)->syscall_rv);
+
     if (child->error)
         return -1;
+#else
+    if (ptrace_command(child, PT_GET_SC_RET, &psr, sizeof(psr)) < 0)
+        return -1;
 
+    if (psr.sr_error != 0)
+        rv = -psr.sr_error;
+    else
+        rv = psr.sr_retval[0];
+#endif
     setreg(reg_ip, *(unsigned long*)((void*)&child->regs +
                                      personality(child)->reg_ip));
 
