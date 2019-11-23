@@ -148,6 +148,24 @@ int find_terminal_emulator(struct steal_pty_state *steal) {
     return 0;
 }
 
+int grab_uid(pid_t pid, uid_t *out) {
+    struct procstat *procstat;
+    struct kinfo_proc *kp;
+    unsigned int cnt;
+
+    procstat = procstat_open_sysctl();
+    kp = procstat_getprocs(procstat, KERN_PROC_PID, pid, &cnt);
+
+    if (kp && cnt > 0)
+        *out = kp->ki_uid;
+    else
+        return ESRCH;
+    procstat_freeprocs(procstat, kp);
+    procstat_close(procstat);
+
+    return 0;
+}
+
 int get_terminal_state(struct steal_pty_state *steal, pid_t target) {
     struct procstat *procstat;
     struct kinfo_proc *kp;
@@ -168,6 +186,8 @@ int get_terminal_state(struct steal_pty_state *steal, pid_t target) {
     if ((err = find_terminal_emulator(steal)))
         return err;
 
+    if ((err = grab_uid(steal->emulator_pid, &steal->emulator_uid)))
+        return err;
 done:
     procstat_freeprocs(procstat, kp);
     procstat_close(procstat);
