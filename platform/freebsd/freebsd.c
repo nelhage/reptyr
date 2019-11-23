@@ -148,6 +148,19 @@ int find_terminal_emulator(struct steal_pty_state *steal) {
     return 0;
 }
 
+int fill_proc_stat(struct steal_pty_state *steal, struct kinfo_proc *kp) {
+    struct proc_stat *ps = &steal->target_stat;
+
+    if (strlcpy(ps->comm, kp->ki_comm, sizeof(ps->comm)) >= sizeof(ps->comm))
+      return ENOMEM;
+    ps->pid = kp->ki_pid;
+    ps->ppid = kp->ki_ppid;
+    ps->sid = kp->ki_sid;
+    ps->pgid = kp->ki_pgid;
+
+    return 0;
+}
+
 int grab_uid(pid_t pid, uid_t *out) {
     struct procstat *procstat;
     struct kinfo_proc *kp;
@@ -182,6 +195,9 @@ int get_terminal_state(struct steal_pty_state *steal, pid_t target) {
         err = EINVAL;
         goto done;
     }
+
+    if ((err = fill_proc_stat(steal, kp)))
+        return err;
 
     if ((err = find_terminal_emulator(steal)))
         return err;
