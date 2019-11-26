@@ -2,6 +2,8 @@ import pexpect
 import os
 import sys
 
+from util import expect_eof
+
 if os.getenv("NO_TEST_STEAL") is not None:
     print("Skipping tty-stealing tests because $NO_TEST_STEAL is set.")
     sys.exit(0)
@@ -32,7 +34,7 @@ reptyr.sendline("world")
 reptyr.expect("ECHO: world")
 
 child.sendline("final")
-child.expect(pexpect.EOF)
+expect_eof(child.child_fd)
 assert os.stat("/dev/null").st_rdev == os.fstat(child.fileno()).st_rdev
 
 reptyr.sendeof()
