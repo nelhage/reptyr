@@ -107,7 +107,7 @@ int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
                 goto out;
             }
 
-            if (vn.vn_dev == kp->ki_tdev) {
+            if (vn.vn_dev == kp->ki_tdev && fst->fs_fd >= 0) {
                 if (fd_array_push(&fds, fst->fs_fd) != 0) {
                     error("Unable to allocate memory for fd array.");
                     goto out;
