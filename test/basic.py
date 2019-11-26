@@ -1,6 +1,8 @@
 import pexpect
 import sys
 
+from util import expect_eof
+
 child = pexpect.spawn("test/victim")
 child.logfile = sys.stdout
 child.setecho(False)
@@ -13,7 +15,7 @@ reptyr.sendline("world")
 reptyr.expect("ECHO: world")
 
 child.sendline("final")
-child.expect(pexpect.EOF)
+expect_eof(child.child_fd)
 
 reptyr.sendeof()
 reptyr.expect(pexpect.EOF)
