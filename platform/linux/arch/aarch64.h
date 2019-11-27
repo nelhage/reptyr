@@ -19,6 +19,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+
+#ifndef NT_ARM_SYSTEM_CALL
+#define NT_ARM_SYSTEM_CALL	0x404	/* ARM system call number */
+#endif
+
 static struct ptrace_personality arch_personality[1] = {
     {
         offsetof(struct user_regs_struct, regs[0]),
