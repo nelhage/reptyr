@@ -3,14 +3,18 @@ import sys
 
 from util import expect_eof
 
+logfile = sys.stdout
+if sys.version_info[0] >= 3:
+    logfile = logfile.buffer
+
 child = pexpect.spawn("test/victim")
-child.logfile = sys.stdout
+child.logfile = logfile
 child.setecho(False)
 child.sendline("hello")
 child.expect("ECHO: hello")
 
 reptyr = pexpect.spawn("./reptyr -V %d" % (child.pid,))
-reptyr.logfile = sys.stdout
+reptyr.logfile = logfile
 reptyr.sendline("world")
 reptyr.expect("ECHO: world")
 

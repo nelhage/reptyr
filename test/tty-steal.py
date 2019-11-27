@@ -8,6 +8,10 @@ if os.getenv("NO_TEST_STEAL") is not None:
     print("Skipping tty-stealing tests because $NO_TEST_STEAL is set.")
     sys.exit(0)
 
+logfile = sys.stdout
+if sys.version_info[0] >= 3:
+    logfile = logfile.buffer
+
 did_prctl = False
 try:
     import prctl
@@ -28,7 +32,7 @@ child.expect("ECHO: hello")
 
 reptyr = pexpect.spawn("./reptyr -V -T %d" % (child.pid,))
 print("spawned children: me={} victim={} reptyr={}".format(os.getpid(), child.pid, reptyr.pid))
-reptyr.logfile = sys.stdout
+reptyr.logfile = logfile
 
 reptyr.sendline("world")
 reptyr.expect("ECHO: world")
