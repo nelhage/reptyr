@@ -9,7 +9,6 @@ arch:
 addons:
   apt:
     packages:
-      - gcc-multilib
       - libcap-dev
 env:
   - PYTHON_CMD=python3
