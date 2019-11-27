@@ -148,6 +148,37 @@ int find_terminal_emulator(struct steal_pty_state *steal) {
     return 0;
 }
 
+int fill_proc_stat(struct steal_pty_state *steal, struct kinfo_proc *kp) {
+    struct proc_stat *ps = &steal->target_stat;
+
+    if (strlcpy(ps->comm, kp->ki_comm, sizeof(ps->comm)) >= sizeof(ps->comm))
+      return ENOMEM;
+    ps->pid = kp->ki_pid;
+    ps->ppid = kp->ki_ppid;
+    ps->sid = kp->ki_sid;
+    ps->pgid = kp->ki_pgid;
+
+    return 0;
+}
+
+int grab_uid(pid_t pid, uid_t *out) {
+    struct procstat *procstat;
+    struct kinfo_proc *kp;
+    unsigned int cnt;
+
+    procstat = procstat_open_sysctl();
+    kp = procstat_getprocs(procstat, KERN_PROC_PID, pid, &cnt);
+
+    if (kp && cnt > 0)
+        *out = kp->ki_uid;
+    else
+        return ESRCH;
+    procstat_freeprocs(procstat, kp);
+    procstat_close(procstat);
+
+    return 0;
+}
+
 int get_terminal_state(struct steal_pty_state *steal, pid_t target) {
     struct procstat *procstat;
     struct kinfo_proc *kp;
@@ -165,9 +196,14 @@ int get_terminal_state(struct steal_pty_state *steal, pid_t target) {
         goto done;
     }
 
+    if ((err = fill_proc_stat(steal, kp)))
+        return err;
+
     if ((err = find_terminal_emulator(steal)))
         return err;
 
+    if ((err = grab_uid(steal->emulator_pid, &steal->emulator_uid)))
+        return err;
 done:
     procstat_freeprocs(procstat, kp);
     procstat_close(procstat);
@@ -175,8 +211,32 @@ done:
 }
 
 int find_master_fd(struct steal_pty_state *steal) {
-    error("How do I find master in FreeBSD? FIXME.");
-    return EINVAL;
+    struct filestat *fst;
+    struct filestat_list *head;
+    struct procstat *procstat;
+    struct kinfo_proc *kp;
+    unsigned int cnt;
+
+    head = get_procfiles(steal->child.pid, &kp, &procstat, &cnt);
+    procstat = procstat_open_sysctl();
+
+    STAILQ_FOREACH(fst, head, next) {
+        if (fst->fs_type != PS_FST_TYPE_PTS)
+            continue;
+
+        if (fd_array_push(&steal->master_fds, fst->fs_fd) != 0) {
+            error("unable to allocate memory for fd array");
+            return ENOMEM;
+        }
+    }
+
+    procstat_freefiles(procstat, head);
+    procstat_freeprocs(procstat, kp);
+    procstat_close(procstat);
+    debug("Found %d master tty fds in child %d.", steal->master_fds.n, steal->child.pid);
+    if (steal->master_fds.n == 0)
+        return ESRCH;
+    return 0;
 }
 
 int get_pt() {
