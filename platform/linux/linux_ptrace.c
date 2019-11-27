@@ -22,7 +22,7 @@
 
 #ifdef __linux__
 
-#include <elf.h>
+#include <linux/elf.h>
 #include "../../ptrace.h"
 #include "../platform.h"
 
