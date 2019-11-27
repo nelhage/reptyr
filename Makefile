@@ -17,6 +17,7 @@ BINDIR=$(PREFIX)/bin
 MANDIR=$(PREFIX)/share/man
 
 PKG_CONFIG ?= pkg-config
+PYTHON_CMD ?= python2
 
 all: reptyr
 
@@ -24,8 +25,8 @@ reptyr: $(OBJS)
 
 ifeq ($(DISABLE_TESTS),)
 test: reptyr test/victim PHONY
-	python2 test/basic.py
-	python2 test/tty-steal.py
+	$(PYTHON_CMD) test/basic.py
+	$(PYTHON_CMD) test/tty-steal.py
 else
 test: all
 endif
