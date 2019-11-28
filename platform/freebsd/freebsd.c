@@ -218,7 +218,6 @@ int find_master_fd(struct steal_pty_state *steal) {
     unsigned int cnt;
 
     head = get_procfiles(steal->child.pid, &kp, &procstat, &cnt);
-    procstat = procstat_open_sysctl();
 
     STAILQ_FOREACH(fst, head, next) {
         if (fst->fs_type != PS_FST_TYPE_PTS)
