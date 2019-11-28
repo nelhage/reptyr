@@ -1,7 +1,12 @@
+import os
 import pexpect
 import sys
 
 from util import expect_eof
+
+if os.getenv("NO_TEST_BASIC") is not None:
+    print("Skipping basic tests because $NO_TEST_BASIC is set.")
+    sys.exit(0)
 
 logfile = sys.stdout
 if sys.version_info[0] >= 3:

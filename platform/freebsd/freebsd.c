@@ -157,6 +157,7 @@ int fill_proc_stat(struct steal_pty_state *steal, struct kinfo_proc *kp) {
     ps->ppid = kp->ki_ppid;
     ps->sid = kp->ki_sid;
     ps->pgid = kp->ki_pgid;
+    ps->ctty = kp->ki_tdev;
 
     return 0;
 }
@@ -211,17 +212,28 @@ done:
 }
 
 int find_master_fd(struct steal_pty_state *steal) {
+    char errbuf[_POSIX2_LINE_MAX];
     struct filestat *fst;
     struct filestat_list *head;
     struct procstat *procstat;
     struct kinfo_proc *kp;
+    struct ptsstat pts;
     unsigned int cnt;
+    int err;
 
     head = get_procfiles(steal->child.pid, &kp, &procstat, &cnt);
-    procstat = procstat_open_sysctl();
 
     STAILQ_FOREACH(fst, head, next) {
         if (fst->fs_type != PS_FST_TYPE_PTS)
+            continue;
+
+        err = procstat_get_pts_info(procstat, fst, &pts, errbuf);
+        if (err != 0) {
+            error("error discovering fd=%d", fst->fs_fd);
+            continue;
+        }
+
+        if (pts.dev != steal->target_stat.ctty)
             continue;
 
         if (fd_array_push(&steal->master_fds, fst->fs_fd) != 0) {
