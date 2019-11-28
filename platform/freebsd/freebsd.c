@@ -157,6 +157,7 @@ int fill_proc_stat(struct steal_pty_state *steal, struct kinfo_proc *kp) {
     ps->ppid = kp->ki_ppid;
     ps->sid = kp->ki_sid;
     ps->pgid = kp->ki_pgid;
+    ps->ctty = kp->ki_tdev;
 
     return 0;
 }
