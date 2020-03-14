@@ -22,6 +22,9 @@
 #ifndef PTRACE_H
 #define PTRACE_H
 
+#ifdef __powerpc__
+#include <asm/ptrace.h>
+#endif
 #include <sys/ptrace.h>
 #include <sys/types.h>
 #include <sys/user.h>
