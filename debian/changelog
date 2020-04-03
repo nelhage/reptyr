@@ -1,3 +1,9 @@
+reptyr (0.6.2-1.3) unstable; urgency=medium
+
+  * Switch to Python 3 (Closes: #938354)
+
+ -- Moritz Muehlenhoff <jmm@debian.org>  Fri, 03 Apr 2020 19:45:32 +0200
+
 reptyr (0.6.2-1.2) unstable; urgency=medium
 
   * Non-maintainer upload.

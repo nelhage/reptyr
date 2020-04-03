@@ -1,0 +1,28 @@
+Upstream commit 8a390e46ba10774ede1e16c28ffe7aca9259d0fa and a patch
+to invoke the tests with python 3
+
+Adresses #938354
+--- reptyr-0.6.2.orig/Makefile
++++ reptyr-0.6.2/Makefile
+@@ -20,8 +20,8 @@ reptyr: $(OBJS)
+ 
+ ifeq ($(DISABLE_TESTS),)
+ test: reptyr test/victim PHONY
+-	python test/basic.py
+-	python test/tty-steal.py
++	python3 test/basic.py
++	python3 test/tty-steal.py
+ else
+ test: all
+ endif
+--- reptyr-0.6.2.orig/test/tty-steal.py
++++ reptyr-0.6.2/test/tty-steal.py
+@@ -3,7 +3,7 @@ import os
+ import sys
+ 
+ if os.getenv("NO_TEST_STEAL") is not None:
+-    print "Skipping tty-stealing tests because $NO_TEST_STEAL is set."
++    print("Skipping tty-stealing tests because $NO_TEST_STEAL is set.")
+     sys.exit(0)
+ 
+ child = pexpect.spawn("test/victim")
