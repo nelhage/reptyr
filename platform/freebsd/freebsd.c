@@ -55,7 +55,7 @@ int check_pgroup(pid_t target) {
 int check_proc_stopped(pid_t pid, int fd) {
     struct procstat *procstat;
     struct kinfo_proc *kp;
-    int state;
+    int state = 0;
     unsigned int cnt;
 
     procstat = procstat_open_sysctl();
