@@ -71,17 +71,16 @@ reptyr works on i386, x86_64, and ARM. Ports to other architectures should be
 straightforward, and should in most cases be as simple as adding an arch/ARCH.h
 file and adding a clause to the ifdef ladder in ptrace.c.
 
-ptrace_scope on Ubuntu Maverick and up
---------------------------------------
+ptrace_scope
+------------
 
 `reptyr` depends on the `ptrace` system call to attach to the remote program. On
-Ubuntu Maverick and higher, this ability is disabled by default for security
-reasons. You can enable it temporarily by doing
+modern linux systems, this ability is disabled by default for security reasons.
+You can enable it for `reptyr` binary
 
-    # echo 0 > /proc/sys/kernel/yama/ptrace_scope
+    setcap cap_sys_ptrace=eip /usr/bin/reptyr
 
-as root, or permanently by editing the file /etc/sysctl.d/10-ptrace.conf, which
-also contains more information about exactly what this setting accomplishes.
+as root.
 
 reptyr -l
 ---------
