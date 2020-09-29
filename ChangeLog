@@ -1,3 +1,7 @@
+* 0.8.0 (Sep 29, 2020)
+ - Resolve a number of bugs in FreeBSD support
+ - Implement reptyr -T support for FreeBSD
+
 * 0.7.0 (Dec 05, 2018)
  - Add bash completion support
  - Fix compilation with musl libc, CentOS, or GCC 7+
