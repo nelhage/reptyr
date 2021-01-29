@@ -1,6 +1,3 @@
-env:
-  CIRRUS_CLONE_DEPTH: 1
-
 freebsd_12_task:
   freebsd_instance:
     image: freebsd-12-1-release-amd64
