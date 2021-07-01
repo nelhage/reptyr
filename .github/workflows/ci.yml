@@ -24,3 +24,22 @@ jobs:
       - run: . venv/bin/activate && make test
       - run: make clean
       - run: . venv/bin/activate && env CFLAGS=-m32 LDFLAGS=-m32 NO_TEST_STEAL=1 make test
+  linux_arm64:
+    runs-on: ubuntu-latest
+    name: "arm64"
+    steps:
+      - uses: actions/checkout@v2.3.4
+        with:
+          persist-credentials: false
+      - run: |
+          docker run --rm --privileged hypriot/qemu-register
+      - uses: docker://debian:buster
+        with:
+          args: |
+            bash -c "set -xe;
+            apt-get update && apt-get -y install gcc-multilib libcap-dev gcc python python-virtualenv python-dev make;
+            virtualenv venv;
+            venv/bin/pip install -r test/requirements.txt;
+            . venv/bin/activate && make test;
+            make clean;
+            . venv/bin/activate && env CFLAGS=-m32 LDFLAGS=-m32 NO_TEST_STEAL=1 make test;"
