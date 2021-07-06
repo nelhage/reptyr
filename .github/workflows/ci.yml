@@ -1,0 +1,26 @@
+name: CI
+on:
+  pull_request: {}
+  push:
+    branches:
+      - master
+    tags:
+      - 'reptyr-*.*'
+      - 'reptyr-*.*.*'
+permissions: read-all
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    container: debian:buster
+    name: "Debian Buster"
+    steps:
+      - uses: actions/checkout@v2.3.4
+        with:
+          persist-credentials: false
+      - run: apt-get update && apt-get -y install gcc-multilib libcap-dev gcc python python-virtualenv python-dev make
+      - run: virtualenv venv
+      - run: venv/bin/pip install -r test/requirements.txt
+      - run: . venv/bin/activate && make test
+      - run: make clean
+      - run: . venv/bin/activate && env CFLAGS=-m32 LDFLAGS=-m32 NO_TEST_STEAL=1 make test
