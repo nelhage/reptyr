@@ -7,26 +7,3 @@ freebsd_12_task:
     gmake
   test_script:
     - env NO_TEST_BASIC=yes gmake test PYTHON_CMD=python3.7
-
-linux_gcc_py2_task:
-  container:
-    image: gcc:latest
-  install_script:
-    - apt-get update
-    - apt-get install -y python-prctl python-pexpect
-  build_script:
-    - make
-  test_script:
-    - make test
-
-linux_gcc_py3_task:
-  container:
-    image: gcc:latest
-  install_script:
-    - apt-get update
-    - apt-get install -y python3-prctl python3-pexpect
-  build_script:
-    - make
-  test_script:
-    - make test PYTHON_CMD=python3
-
