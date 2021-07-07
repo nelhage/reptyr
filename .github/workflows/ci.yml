@@ -14,13 +14,18 @@ jobs:
     runs-on: ubuntu-latest
     container: debian:buster
     name: "Debian Buster"
+    strategy:
+      matrix:
+        python:
+          - python2
+          - python3
     steps:
       - uses: actions/checkout@v2.3.4
         with:
           persist-credentials: false
-      - run: apt-get update && apt-get -y install gcc-multilib libcap-dev gcc python python-virtualenv python-dev make
-      - run: virtualenv venv
+      - run: apt-get update && apt-get -y install gcc-multilib libcap-dev gcc ${{matrix.python}} virtualenv ${{matrix.python}}-dev make
+      - run: virtualenv --python=${{matrix.python}} venv
       - run: venv/bin/pip install -r test/requirements.txt
-      - run: . venv/bin/activate && make test
+      - run: . venv/bin/activate && make PYTHON_CMD=${{matrix.python}} test
       - run: make clean
-      - run: . venv/bin/activate && env CFLAGS=-m32 LDFLAGS=-m32 NO_TEST_STEAL=1 make test
+      - run: . venv/bin/activate && env PYTHON_CMD=${{matrix.python}} CFLAGS=-m32 LDFLAGS=-m32 NO_TEST_STEAL=1 make test
