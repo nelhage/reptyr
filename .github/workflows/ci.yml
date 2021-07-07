@@ -24,7 +24,7 @@ jobs:
         with:
           persist-credentials: false
       - run: apt-get update && apt-get -y install gcc-multilib libcap-dev gcc ${{matrix.python}} virtualenv ${{matrix.python}}-dev make
-      - run: virtualenv venv
+      - run: virtualenv --python=${{matrix.python}} venv
       - run: venv/bin/pip install -r test/requirements.txt
       - run: . venv/bin/activate && make PYTHON_CMD=${{matrix.python}} test
       - run: make clean
