@@ -41,7 +41,7 @@ static inline void arch_fixup_regs(struct ptrace_child *child) {
 	//https://lists.freebsd.org/pipermail/freebsd-hackers/2009-July/029206.html
 }
 
-static inline unsigned long arch_get_register(struct ptrace_child *child, unsigned long oft){
+static inline unsigned long arch_get_register(struct ptrace_child *child, unsigned long oft) {
 	int ret;
 	struct reg regs;
 
@@ -50,7 +50,7 @@ static inline unsigned long arch_get_register(struct ptrace_child *child, unsign
 	return *ptr(&regs,oft);
 }
 
-static inline void arch_set_register(struct ptrace_child *child, unsigned long oft, unsigned long val){
+static inline void arch_set_register(struct ptrace_child *child, unsigned long oft, unsigned long val) {
 	int ret;
 	struct reg regs;
 
