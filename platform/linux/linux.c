@@ -100,7 +100,7 @@ int read_uid(pid_t pid, uid_t *out) {
         *out = -1;
         goto out;
     }
-    if(sscanf(p, "Uid:\t%d", out) < 0) {
+    if (sscanf(p, "Uid:\t%d", out) < 0) {
         debug("Unable to parse emulator uid: unparseable Uid line");
     }
 
@@ -229,7 +229,7 @@ int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
 
     if (stat("/dev/console", &console_st) < 0) {
         error("Unable to stat /dev/console");
-        console_st = (struct stat){
+        console_st = (struct stat) {
             .st_rdev = -1,
         };
     }
