@@ -42,21 +42,19 @@ static inline void arch_fixup_regs(struct ptrace_child *child) {
 }
 
 static inline unsigned long arch_get_register(struct ptrace_child *child, unsigned long oft) {
-	int ret;
 	struct reg regs;
 
-	ret = ptrace_command(child, PT_GETREGS, &regs);
+	(void) ptrace_command(child, PT_GETREGS, &regs);
 
 	return *ptr(&regs,oft);
 }
 
 static inline void arch_set_register(struct ptrace_child *child, unsigned long oft, unsigned long val) {
-	int ret;
 	struct reg regs;
 
-	ret = ptrace_command(child, PT_GETREGS, &regs);
+	(void) ptrace_command(child, PT_GETREGS, &regs);
 	*ptr(&regs,oft)=val;
-	ret = ptrace_command(child, PT_SETREGS, &regs);
+	(void) ptrace_command(child, PT_SETREGS, &regs);
 }
 
 static inline int arch_save_syscall(struct ptrace_child *child) {
