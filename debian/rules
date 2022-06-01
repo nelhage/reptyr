@@ -9,9 +9,9 @@ override_dh_auto_build:
 	dh_auto_build -- $(shell dpkg-buildflags --export=configure)
 
 override_dh_auto_install:
-	dh_auto_install -- PREFIX=/usr
+	dh_auto_install -- PREFIX=/usr BASHCOMPDIR=/usr/share/bash-completion/completions
 
-# reptyr's test suite relies on being able to ptrace non-child
-# processes, which isn't allowed under yama's defaults on Ubuntu
 override_dh_auto_test:
-	#disable
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	PYTHON_CMD=python3 make test
+endif

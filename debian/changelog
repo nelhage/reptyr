@@ -1,3 +1,12 @@
+reptyr (0.8.0-0.1) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * New upstream release (Closes: #925244)
+  * Packages build for arm64, powerpc, ppc64el (Closes: #944501, #945352)
+  * Re-enabled tests (Closes: #890120)
+
+ -- Dima Kogan <dkogan@debian.org>  Tue, 31 May 2022 23:55:23 -0700
+
 reptyr (0.6.2-1.3) unstable; urgency=medium
 
   * Switch to Python 3 (Closes: #938354)

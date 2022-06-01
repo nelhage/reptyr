@@ -2,14 +2,16 @@ Source: reptyr
 Section: misc
 Priority: optional
 Maintainer: Evan Broder <evan@ebroder.net>
-Build-Depends: debhelper (>= 11), python3, python3-pexpect
-Standards-Version: 4.1.3
+Build-Depends: debhelper-compat (= 13),
+               python3,
+               python3-pexpect
+Standards-Version: 4.6.0
 Homepage: https://github.com/nelhage/reptyr
 Vcs-Git: https://github.com/nelhage/reptyr.git -b debian
 Vcs-Browser: https://github.com/nelhage/reptyr/tree/debian
 
 Package: reptyr
-Architecture: i386 amd64 armel armhf
+Architecture: i386 amd64 armel armhf arm64 powerpc ppc64el
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Tool for moving running programs between ptys
  reptyr is a utility for taking an existing running program and

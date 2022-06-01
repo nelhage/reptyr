@@ -1,3 +1,2 @@
-version=3
-opts=uversionmangle=s/(\d+)-(\d+)-(\d+)/$1.$2.$3/ \
-https://github.com/nelhage/reptyr/releases .*/archive/reptyr-([\d.-]+)\.tar\.gz
+version=4
+https://github.com/nelhage/reptyr/tags .*/reptyr-(\d\S+)\.tar\.gz
