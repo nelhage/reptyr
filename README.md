@@ -21,6 +21,21 @@ background it, you will still have to run "bg" or "fg" in the old
 terminal. This is likely impossible to fix in a reasonable way without
 patching your shell.)
 
+Typical usage pattern
+---------------------
+
+* Start a long running process, e.g. `top`
+* Background the process with CTRL-Z
+* Resume the process in the background: `bg`
+* Display your running background jobs with `jobs -l`, this should look like this:
+  * `[1]+  4711 Stopped (signal)        top`
+  * (The `-l` in `jobs -l` makes sure you'll get the PID)
+* Disown the jobs from the current parent with `disown top`. After that, `jobs` will not show the job any more, but `ps -a` will.
+* Start your terminal multiplexer of choice, e.g. `tmux`
+* Reattach to the backgrounded process: `reptyr 4711`
+* Detach your terminal multiplexer (e.g. CTRL-A D) and close ssh
+* Reconnect ssh, attach to your multiplexer (e.g. `tmux attach`), rejoice!
+
 "But wait, isn't this just screenify?"
 --------------------------------------
 
@@ -41,11 +56,16 @@ accomplishes this.
 PORTABILITY
 -----------
 
-reptyr is Linux-only. It uses ptrace to attach to the target and control it at
-the syscall level, so it is highly dependent on Linux's particular syscall API,
-syscalls, and terminal ioctl()s. A port to Solaris or BSD may be technically
-feasible, but would probably require significant re-architecting to abstract out
-the platform-specific bits.
+reptyr supports Linux and FreeBSD. Not all functionality is currently
+available on FreeBSD. (Notably, FreeBSD doesn't support `reptyr -T` at
+this time.
+
+`reptyr` uses ptrace to attach to the target and control it at the
+syscall level, so it is highly dependent on details of the syscall
+API, available syscalls, and terminal ioctl()s. A port to other
+operating systems may be technically feasible, but requires
+significant low-level knowledge of the relevant platform, and may
+entail significant refactors.
 
 reptyr works on i386, x86_64, and ARM. Ports to other architectures should be
 straightforward, and should in most cases be as simple as adding an arch/ARCH.h
@@ -98,4 +118,4 @@ with any questions or bug reports.
 
 URL
 ---
-[http://github.com/nelhage/reptyr]()
+http://github.com/nelhage/reptyr

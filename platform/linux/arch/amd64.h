@@ -25,35 +25,35 @@
 
 static struct ptrace_personality arch_personality[2] = {
     {
-        offsetof(struct user, regs.rax),
-        offsetof(struct user, regs.rdi),
-        offsetof(struct user, regs.rsi),
-        offsetof(struct user, regs.rdx),
-        offsetof(struct user, regs.r10),
-        offsetof(struct user, regs.r8),
-        offsetof(struct user, regs.r9),
-        offsetof(struct user, regs.rip),
+        offsetof(struct user_regs_struct, rax),
+        offsetof(struct user_regs_struct, rdi),
+        offsetof(struct user_regs_struct, rsi),
+        offsetof(struct user_regs_struct, rdx),
+        offsetof(struct user_regs_struct, r10),
+        offsetof(struct user_regs_struct, r8),
+        offsetof(struct user_regs_struct, r9),
+        offsetof(struct user_regs_struct, rip),
     },
     {
-        offsetof(struct user, regs.rax),
-        offsetof(struct user, regs.rbx),
-        offsetof(struct user, regs.rcx),
-        offsetof(struct user, regs.rdx),
-        offsetof(struct user, regs.rsi),
-        offsetof(struct user, regs.rdi),
-        offsetof(struct user, regs.rbp),
-        offsetof(struct user, regs.rip),
+        offsetof(struct user_regs_struct, rax),
+        offsetof(struct user_regs_struct, rbx),
+        offsetof(struct user_regs_struct, rcx),
+        offsetof(struct user_regs_struct, rdx),
+        offsetof(struct user_regs_struct, rsi),
+        offsetof(struct user_regs_struct, rdi),
+        offsetof(struct user_regs_struct, rbp),
+        offsetof(struct user_regs_struct, rip),
     },
 };
 
 struct x86_personality x86_personality[2] = {
     {
-        offsetof(struct user, regs.orig_rax),
-        offsetof(struct user, regs.rax),
+        offsetof(struct user_regs_struct, orig_rax),
+        offsetof(struct user_regs_struct, rax),
     },
     {
-        offsetof(struct user, regs.orig_rax),
-        offsetof(struct user, regs.rax),
+        offsetof(struct user_regs_struct, orig_rax),
+        offsetof(struct user_regs_struct, rax),
     },
 };
 
@@ -65,7 +65,7 @@ struct syscall_numbers arch_syscall_numbers[2] = {
          * include unistd_32.h, but those definitions would conflict with the
          * standard ones. So, let's just hardcode the values for now. Probably
          * we should generate this from unistd_32.h during the build process or
-         * soemthing.
+         * something.
          */
         .nr_mmap    = 90,
         .nr_mmap2   = 192,
@@ -77,7 +77,7 @@ struct syscall_numbers arch_syscall_numbers[2] = {
         .nr_wait4   = 114,
         .nr_signal  = 48,
         .nr_rt_sigaction = 174,
-        .nr_open    = 5,
+        .nr_openat  = 295,
         .nr_close   = 6,
         .nr_ioctl   = 54,
         .nr_dup2    = 63,
@@ -89,7 +89,7 @@ int arch_get_personality(struct ptrace_child *child) {
     unsigned long cs;
 
     cs = ptrace_command(child, PTRACE_PEEKUSER,
-                        offsetof(struct user, regs.cs));
+                        offsetof(struct user_regs_struct, cs));
     if (child->error)
         return -1;
     if (cs == 0x23)

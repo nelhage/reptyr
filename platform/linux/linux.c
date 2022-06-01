@@ -46,13 +46,6 @@ int parse_proc_stat(int statfd, struct proc_stat *out) {
     }
     out->ctty = dev;
 
-    struct stat st;
-    if (fstat(statfd, &st) != 0)
-        return assert_nonzero(errno);
-
-    out->uid = st.st_uid;
-    out->gid = st.st_gid;
-
     return 0;
 }
 
@@ -67,8 +60,51 @@ int read_proc_stat(pid_t pid, struct proc_stat *out) {
         error("Unable to open %s: %s", stat_path, strerror(errno));
         return -statfd;
     }
-
     err = parse_proc_stat(statfd, out);
+
+
+    close(statfd);
+    return err;
+}
+
+int read_uid(pid_t pid, uid_t *out) {
+    char stat_path[PATH_MAX];
+    char buf[1024];
+    int statfd;
+    int err = 0;
+    int n;
+    char *p = buf;
+
+    snprintf(stat_path, sizeof stat_path, "/proc/%d/status", pid);
+    statfd = open(stat_path, O_RDONLY);
+    if (statfd < 0) {
+        error("Unable to open %s: %s", stat_path, strerror(errno));
+        return -statfd;
+    }
+
+    if ((n = read(statfd, buf, sizeof(buf))) < 0) {
+        err = assert_nonzero(errno);
+        goto out;
+    }
+    while (p < buf + n) {
+        if (strncmp(p, "Uid:\t", strlen("Uid:\t")) == 0)
+            break;
+        p = memchr(p, '\n', buf+n-p);
+        if (p == NULL)
+            break;
+        p++;
+        continue;
+    }
+    if (p == NULL || p >= buf + n) {
+        debug("Unable to parse emulator uid: no Uid line found");
+        *out = -1;
+        goto out;
+    }
+    if(sscanf(p, "Uid:\t%d", out) < 0) {
+        debug("Unable to parse emulator uid: unparseable Uid line");
+    }
+
+ out:
     close(statfd);
     return err;
 }
@@ -148,7 +184,7 @@ int check_pgroup(pid_t target) {
                 memcpy(pid_stat.comm, "???", 4);
             }
             error("Process %d (%.*s) shares %d's process group. Unable to attach.\n"
-                  "(This most commonly means that %d has suprocesses).",
+                  "(This most commonly means that %d has sub-processes).",
                   (int)pid, TASK_COMM_LENGTH, pid_stat.comm, (int)target, (int)target);
             err = EINVAL;
             goto out;
@@ -192,9 +228,10 @@ int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
     }
 
     if (stat("/dev/console", &console_st) < 0) {
-        child->error = errno;
         error("Unable to stat /dev/console");
-        return NULL;
+        console_st = (struct stat){
+            .st_rdev = -1,
+        };
     }
 
     snprintf(buf, sizeof buf, "/proc/%d/fd/", child->pid);
@@ -235,6 +272,9 @@ int get_terminal_state(struct steal_pty_state *steal, pid_t target) {
     }
 
     if ((err = find_terminal_emulator(steal)))
+        return err;
+
+    if ((err = read_uid(steal->emulator_pid, &steal->emulator_uid)))
         return err;
 
     return 0;
@@ -362,7 +402,7 @@ void move_process_group(struct ptrace_child *child, pid_t from, pid_t to) {
 }
 
 void copy_user(struct ptrace_child *d, struct ptrace_child *s) {
-    memcpy(&d->user, &s->user, sizeof(s->user));
+    memcpy(&d->regs, &s->regs, sizeof(s->regs));
 }
 
 unsigned long ptrace_socketcall(struct ptrace_child *child,

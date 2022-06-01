@@ -23,6 +23,14 @@ EOS
     machine.vm.box = 'chef/fedora-20'
   end
 
+  config.vm.define 'centos-6-x86_64' do |machine|
+    machine.vm.box = 'bento/centos-6.7'
+  end
+
+  config.vm.define 'centos-5-x86_64' do |machine|
+    machine.vm.box = 'bento/centos-5.11'
+  end
+
   config.vm.synced_folder ".", "/vagrant", type: 'nfs', id: 'vagrant-root'
 
 end

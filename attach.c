@@ -69,11 +69,19 @@ static void do_unmap(struct ptrace_child *child, child_addr_t addr, unsigned lon
     do_syscall(child, munmap, (unsigned long)addr, len, 0, 0, 0, 0);
 }
 
+static int do_fork(struct ptrace_child *child) {
+    if (ptrace_syscall_numbers(child)->nr_fork != -1) {
+        return do_syscall(child, fork, 0, 0, 0, 0, 0, 0);
+    } else {
+        return do_syscall(child, clone, SIGCHLD, 0, 0, 0, 0, 0);
+    }
+}
+
 int do_setsid(struct ptrace_child *child) {
     int err = 0;
     struct ptrace_child dummy;
 
-    err = do_syscall(child, fork, 0, 0, 0, 0, 0, 0);
+    err = do_fork(child);
     if (err < 0)
         return err;
 
@@ -110,9 +118,20 @@ int do_setsid(struct ptrace_child *child) {
 out_kill:
     kill(dummy.pid, SIGKILL);
     ptrace_detach_child(&dummy);
-    //ptrace_wait(&dummy);
+    ptrace_wait(&dummy);
     do_syscall(child, wait4, dummy.pid, 0, WNOHANG, 0, 0, 0);
     return err;
+}
+
+static int do_dup2(struct ptrace_child *child, int oldfd, int newfd) {
+    if (oldfd == newfd) {
+        return 0;
+    }
+    if (ptrace_syscall_numbers(child)->nr_dup2 != -1) {
+        return do_syscall(child, dup2, oldfd, newfd, 0, 0, 0, 0);
+    } else {
+        return do_syscall(child, dup3, oldfd, newfd, 0, 0, 0, 0);
+    }
 }
 
 int ignore_hup(struct ptrace_child *child, child_addr_t scratch_page) {
@@ -237,6 +256,16 @@ out:
     return err;
 }
 
+int preflight_check(pid_t pid) {
+    struct ptrace_child child;
+    debug("Making sure we have permission to attach...");
+    if (ptrace_attach_child(&child, pid)) {
+        return child.error;
+    }
+    ptrace_detach_child(&child);
+    return 0;
+}
+
 int attach_child(pid_t pid, const char *pty, int force_stdio) {
     struct ptrace_child child;
     child_addr_t scratch_page = -1;
@@ -249,6 +278,10 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
 #endif
 
     if ((err = check_pgroup(pid))) {
+        return err;
+    }
+
+    if ((err = preflight_check(pid))) {
         return err;
     }
 
@@ -302,9 +335,9 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
         goto out_free_fds;
     }
 
-    child_fd = do_syscall(&child, open,
-                          scratch_page, O_RDWR | O_NOCTTY,
-                          0, 0, 0, 0);
+    child_fd = do_syscall(&child, openat,
+                          -1, scratch_page, O_RDWR | O_NOCTTY,
+                          0, 0, 0);
     if (child_fd < 0) {
         err = child_fd;
         error("Unable to open the tty in the child.");
@@ -336,7 +369,7 @@ int attach_child(pid_t pid, const char *pty, int force_stdio) {
     debug("Set the controlling tty");
 
     for (i = 0; i < n_fds; i++) {
-        err = do_syscall(&child, dup2, child_fd, child_tty_fds[i], 0, 0, 0, 0);
+        err = do_dup2(&child, child_fd, child_tty_fds[i]);
         if (err < 0)
             error("Problem moving child fd number %d to new tty: %s", child_tty_fds[i], strerror(errno));
     }
@@ -375,8 +408,11 @@ int setup_steal_socket(struct steal_pty_state *steal) {
         return errno;
 
     steal->addr_un.sun_family = AF_UNIX;
-    snprintf(steal->addr_un.sun_path, sizeof(steal->addr_un.sun_path),
-             "%s/reptyr.sock", steal->tmpdir);
+    if (snprintf(steal->addr_un.sun_path, sizeof(steal->addr_un.sun_path),
+                 "%s/reptyr.sock", steal->tmpdir) >= sizeof(steal->addr_un.sun_path)) {
+        error("tmpdir path too long!");
+        return ENAMETOOLONG;
+    }
 
     if ((steal->sockfd = socket(AF_UNIX, SOCK_DGRAM, 0)) < 0)
         return errno;
@@ -384,9 +420,9 @@ int setup_steal_socket(struct steal_pty_state *steal) {
     if (bind(steal->sockfd, &steal->addr, sizeof(steal->addr_un)) < 0)
         return errno;
 
-    if (chown(steal->addr_un.sun_path, steal->target_stat.uid, steal->target_stat.gid) < 0)
+    if (chown(steal->addr_un.sun_path, steal->emulator_uid, -1) < 0)
         debug("chown %s: %s", steal->addr_un.sun_path, strerror(errno));
-    if (chown(steal->tmpdir, steal->target_stat.uid, steal->target_stat.gid) < 0)
+    if (chown(steal->tmpdir, steal->emulator_uid, -1) < 0)
         debug("chown %s: %s", steal->tmpdir, strerror(errno));
 
     return 0;
@@ -484,7 +520,7 @@ int steal_child_pty(struct steal_pty_state *steal) {
 // it doesn't die.
 int steal_block_hup(struct steal_pty_state *steal) {
     struct ptrace_child leader;
-    child_addr_t scratch;
+    child_addr_t scratch = 0;
     int err = 0;
 
     if ((err = grab_pid(steal->target_stat.sid, &leader, &scratch)))
@@ -505,14 +541,14 @@ int steal_cleanup_child(struct steal_pty_state *steal) {
         return steal->child.error;
     }
 
-    int nullfd = do_syscall(&steal->child, open, steal->child_scratch, O_RDWR, 0, 0, 0, 0);
+    int nullfd = do_syscall(&steal->child, openat, -1, steal->child_scratch, O_RDWR, 0, 0, 0);
     if (nullfd < 0) {
         return steal->child.error;
     }
 
     int i;
     for (i = 0; i < steal->master_fds.n; ++i) {
-        do_syscall(&steal->child, dup2, nullfd, steal->master_fds.fds[i], 0, 0, 0, 0);
+        do_dup2(&steal->child, nullfd, steal->master_fds.fds[i]);
     }
 
     do_syscall(&steal->child, close, nullfd, 0, 0, 0, 0, 0);
@@ -532,6 +568,9 @@ int steal_pty(pid_t pid, int *pty) {
     struct steal_pty_state steal = {};
     long page_size = sysconf(_SC_PAGE_SIZE);
 
+    if ((err = preflight_check(pid)))
+        goto out;
+
     if ((err = get_terminal_state(&steal, pid)))
         goto out;
 
@@ -539,6 +578,7 @@ int steal_pty(pid_t pid, int *pty) {
         goto out;
 
     debug("Listening on socket: %s", steal.addr_un.sun_path);
+    debug("Attaching terminal emulator pid=%d", steal.emulator_pid);
 
     if ((err = grab_pid(steal.emulator_pid, &steal.child, &steal.child_scratch)))
         goto out;

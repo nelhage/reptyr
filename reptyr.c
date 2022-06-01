@@ -124,23 +124,34 @@ void do_proxy(int pty) {
     char buf[4096];
     ssize_t count;
     fd_set set;
-    struct timeval timeout;
+    sigset_t mask;
+    sigset_t select_mask;
+    struct sigaction sa;
+
+    // Block WINCH while we're outside the select, but unblock it
+    // while we're inside:
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGWINCH);
+    if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1) {
+        fprintf(stderr, "sigprocmask: %m");
+        return;
+    }
+    sa.sa_handler = do_winch;
+    sa.sa_flags = 0;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGWINCH, &sa, NULL);
+    resize_pty(pty);
+
     while (1) {
         if (winch_happened) {
             winch_happened = 0;
-            /*
-             * FIXME: If a signal comes in after this point but before
-             * select(), the resize will be delayed until we get more
-             * input. signalfd() is probably the cleanest solution.
-             */
             resize_pty(pty);
         }
         FD_ZERO(&set);
         FD_SET(0, &set);
         FD_SET(pty, &set);
-        timeout.tv_sec = 0;
-        timeout.tv_usec = 1000;
-        if (select(pty + 1, &set, NULL, NULL, &timeout) < 0) {
+        sigemptyset(&select_mask);
+        if (pselect(pty + 1, &set, NULL, NULL, NULL, &select_mask) < 0) {
             if (errno == EINTR)
                 continue;
             fprintf(stderr, "select: %m");
@@ -179,7 +190,6 @@ void usage(char *me) {
 
 int main(int argc, char **argv) {
     struct termios saved_termios;
-    struct sigaction act;
     int pty;
     int opt;
     int err;
@@ -287,11 +297,6 @@ int main(int argc, char **argv) {
     }
 
     setup_raw(&saved_termios);
-    memset(&act, 0, sizeof act);
-    act.sa_handler = do_winch;
-    act.sa_flags   = 0;
-    sigaction(SIGWINCH, &act, NULL);
-    resize_pty(pty);
     do_proxy(pty);
     do {
         errno = 0;

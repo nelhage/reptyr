@@ -19,24 +19,36 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include "x86_common.h"
 
 static struct ptrace_personality arch_personality[1] = {
     {
-        offsetof(struct user_regs_struct, eax),
-        offsetof(struct user_regs_struct, ebx),
-        offsetof(struct user_regs_struct, ecx),
-        offsetof(struct user_regs_struct, edx),
-        offsetof(struct user_regs_struct, esi),
-        offsetof(struct user_regs_struct, edi),
-        offsetof(struct user_regs_struct, ebp),
-        offsetof(struct user_regs_struct, eip),
+        offsetof(struct pt_regs, gpr[3]),
+        offsetof(struct pt_regs, gpr[3]),
+        offsetof(struct pt_regs, gpr[4]),
+        offsetof(struct pt_regs, gpr[5]),
+        offsetof(struct pt_regs, gpr[6]),
+        offsetof(struct pt_regs, gpr[7]),
+        offsetof(struct pt_regs, gpr[8]),
+        offsetof(struct pt_regs, nip),
     }
 };
 
-struct x86_personality x86_personality[1] = {
-    {
-        offsetof(struct user_regs_struct, orig_eax),
-        offsetof(struct user_regs_struct, eax),
-    }
-};
+static const unsigned long r0off = offsetof(struct pt_regs, gpr[0]);
+
+static inline void arch_fixup_regs(struct ptrace_child *child) {
+    child->regs.nip -= 4;
+}
+
+static inline int arch_set_syscall(struct ptrace_child *child,
+                                   unsigned long sysno) {
+    return ptrace_command(child, PTRACE_POKEUSER, r0off, sysno);
+}
+
+static inline int arch_save_syscall(struct ptrace_child *child) {
+    child->saved_syscall = *ptr(&child->regs, r0off);
+    return 0;
+}
+
+static inline int arch_restore_syscall(struct ptrace_child *child) {
+    return arch_set_syscall(child, child->saved_syscall);
+}

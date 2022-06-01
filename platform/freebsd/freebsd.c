@@ -39,6 +39,7 @@ int check_pgroup(pid_t target) {
     pg = getpgid(target);
 
     procstat = procstat_open_sysctl();
+    cnt = 0;
     kp = procstat_getprocs(procstat, KERN_PROC_PGRP, pg, &cnt);
     procstat_freeprocs(procstat, kp);
     procstat_close(procstat);
@@ -54,10 +55,11 @@ int check_pgroup(pid_t target) {
 int check_proc_stopped(pid_t pid, int fd) {
     struct procstat *procstat;
     struct kinfo_proc *kp;
-    int state;
+    int state = 0;
     unsigned int cnt;
 
     procstat = procstat_open_sysctl();
+    cnt = 0;
     kp = procstat_getprocs(procstat, KERN_PROC_PID, pid, &cnt);
 
     if (cnt > 0)
@@ -79,6 +81,7 @@ int check_proc_stopped(pid_t pid, int fd) {
 struct filestat_list* get_procfiles(pid_t pid, struct kinfo_proc **kp, struct procstat **procstat, unsigned int *cnt) {
     int mflg = 0; // include mmapped files
     (*procstat) = procstat_open_sysctl();
+    *cnt = 0;
     (*kp) = procstat_getprocs(*procstat, KERN_PROC_PID, pid, cnt);
     if ((*kp) == NULL || *cnt < 1)
         return NULL;
@@ -107,7 +110,7 @@ int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count) {
                 goto out;
             }
 
-            if (vn.vn_dev == kp->ki_tdev) {
+            if (vn.vn_dev == kp->ki_tdev && fst->fs_fd >= 0) {
                 if (fd_array_push(&fds, fst->fs_fd) != 0) {
                     error("Unable to allocate memory for fd array.");
                     goto out;
@@ -137,11 +140,45 @@ int find_terminal_emulator(struct steal_pty_state *steal) {
     unsigned int cnt;
 
     procstat = procstat_open_sysctl();
+    cnt = 0;
     kp = procstat_getprocs(procstat, KERN_PROC_PID, steal->target_stat.sid, &cnt);
 
     if (kp && cnt > 0)
         steal->emulator_pid = kp->ki_ppid;
 
+    procstat_freeprocs(procstat, kp);
+    procstat_close(procstat);
+
+    return (cnt != 0 ? 0 : 1);
+}
+
+int fill_proc_stat(struct steal_pty_state *steal, struct kinfo_proc *kp) {
+    struct proc_stat *ps = &steal->target_stat;
+
+    if (strlcpy(ps->comm, kp->ki_comm, sizeof(ps->comm)) >= sizeof(ps->comm))
+      return ENOMEM;
+    ps->pid = kp->ki_pid;
+    ps->ppid = kp->ki_ppid;
+    ps->sid = kp->ki_sid;
+    ps->pgid = kp->ki_pgid;
+    ps->ctty = kp->ki_tdev;
+
+    return 0;
+}
+
+int grab_uid(pid_t pid, uid_t *out) {
+    struct procstat *procstat;
+    struct kinfo_proc *kp;
+    unsigned int cnt;
+
+    procstat = procstat_open_sysctl();
+    cnt = 0;
+    kp = procstat_getprocs(procstat, KERN_PROC_PID, pid, &cnt);
+
+    if (kp && cnt > 0)
+        *out = kp->ki_uid;
+    else
+        return ESRCH;
     procstat_freeprocs(procstat, kp);
     procstat_close(procstat);
 
@@ -155,6 +192,7 @@ int get_terminal_state(struct steal_pty_state *steal, pid_t target) {
     int err = 0;
 
     procstat = procstat_open_sysctl();
+    cnt = 0;
     kp = procstat_getprocs(procstat, KERN_PROC_PID, target, &cnt);
     if (kp == NULL || cnt < 1)
         goto done;
@@ -165,9 +203,14 @@ int get_terminal_state(struct steal_pty_state *steal, pid_t target) {
         goto done;
     }
 
+    if ((err = fill_proc_stat(steal, kp)))
+        return err;
+
     if ((err = find_terminal_emulator(steal)))
         return err;
 
+    if ((err = grab_uid(steal->emulator_pid, &steal->emulator_uid)))
+        return err;
 done:
     procstat_freeprocs(procstat, kp);
     procstat_close(procstat);
@@ -175,8 +218,43 @@ done:
 }
 
 int find_master_fd(struct steal_pty_state *steal) {
-    error("How do I find master in FreeBSD? FIXME.");
-    return EINVAL;
+    char errbuf[_POSIX2_LINE_MAX];
+    struct filestat *fst;
+    struct filestat_list *head;
+    struct procstat *procstat;
+    struct kinfo_proc *kp;
+    struct ptsstat pts;
+    unsigned int cnt;
+    int err;
+
+    head = get_procfiles(steal->child.pid, &kp, &procstat, &cnt);
+
+    STAILQ_FOREACH(fst, head, next) {
+        if (fst->fs_type != PS_FST_TYPE_PTS)
+            continue;
+
+        err = procstat_get_pts_info(procstat, fst, &pts, errbuf);
+        if (err != 0) {
+            error("error discovering fd=%d", fst->fs_fd);
+            continue;
+        }
+
+        if (pts.dev != steal->target_stat.ctty)
+            continue;
+
+        if (fd_array_push(&steal->master_fds, fst->fs_fd) != 0) {
+            error("unable to allocate memory for fd array");
+            return ENOMEM;
+        }
+    }
+
+    procstat_freefiles(procstat, head);
+    procstat_freeprocs(procstat, kp);
+    procstat_close(procstat);
+    debug("Found %d master tty fds in child %d.", steal->master_fds.n, steal->child.pid);
+    if (steal->master_fds.n == 0)
+        return ESRCH;
+    return 0;
 }
 
 int get_pt() {
@@ -228,6 +306,7 @@ void move_process_group(struct ptrace_child *child, pid_t from, pid_t to) {
     int err;
 
     procstat = procstat_open_sysctl();
+    cnt = 0;
     kp = procstat_getprocs(procstat, KERN_PROC_PGRP, from, &cnt);
 
     for (i = 0; i < cnt; i++) {

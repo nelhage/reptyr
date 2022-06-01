@@ -34,7 +34,7 @@ static inline void arch_fixup_regs(struct ptrace_child *child) {
     struct x86_personality *x86pers = x86_pers(child);
     struct ptrace_personality *pers = personality(child);
     struct reg *regs = &child->regs;
-#define ptr(user, off) ((unsigned long*)((void*)(user)+(off)))
+#define ptr(regs, off) ((unsigned long*)((void*)(regs)+(off)))
     *ptr(regs, pers->reg_ip) -= 2;
     *ptr(regs, x86pers->ax) = child->saved_syscall;
     //*ptr(user, x86pers->ax) = *ptr(user, x86pers->orig_ax);

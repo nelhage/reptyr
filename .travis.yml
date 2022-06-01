@@ -1,7 +1,14 @@
 script: make test
+language: python
+python:
+  - "3.7"
+install:
+  - pip install -r test/requirements.txt
+arch:
+  - arm64
+addons:
+  apt:
+    packages:
+      - libcap-dev
 env:
-  - CFLAGS=-m32 LDFLAGS=-m32 DISABLE_TESTS=1
-  - CFLAGS=-m64 LDFLAGS=-m64
-before_install:
-  - sudo apt-get update
-  - sudo apt-get -y install gcc-multilib python-pexpect
+  - PYTHON_CMD=python3

@@ -24,6 +24,14 @@
 #define LINUX_H
 
 #ifdef __linux__
+
+// Important that we include <sys/wait.h> before <linux/*>, for
+// compatibility with certain older libcs, in which <linux/wait.h>
+// #define's some symbols that <sys/wait.h> defines via
+// `enum. c.f. https://bugs.launchpad.net/ubuntu/+source/eglibc/+bug/1261872/
+// and https://github.com/nelhage/reptyr/issues/67
+#include <sys/wait.h>
+
 #include <linux/major.h>
 #include <linux/net.h>
 #include <linux/limits.h>
@@ -32,8 +40,8 @@
 #include <sys/ptrace.h>
 #include <asm/ptrace.h>
 #include <sys/types.h>
+#include <sys/sysmacros.h>
 #include <sys/user.h>
-#include <sys/wait.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>

@@ -23,6 +23,10 @@
 #ifndef PLATFORM_H
 #define PLATFORM_H
 
+#ifdef __APPLE__
+#error "reptyr does not currently support macOS"
+#endif
+
 #include "linux/linux.h"
 #include "freebsd/freebsd.h"
 #include "../ptrace.h"
@@ -45,14 +49,14 @@ struct proc_stat {
     char state;
     pid_t ppid, sid, pgid;
     dev_t ctty;
-    uid_t uid;
-    gid_t gid;
 };
 
 struct steal_pty_state {
     struct proc_stat target_stat;
 
     pid_t emulator_pid;
+    uid_t emulator_uid;
+
     struct fd_array master_fds;
 
     char tmpdir[PATH_MAX];
@@ -75,7 +79,7 @@ int check_proc_stopped(pid_t pid, int fd);
 int *get_child_tty_fds(struct ptrace_child *child, int statfd, int *count);
 int get_terminal_state(struct steal_pty_state *steal, pid_t target);
 int find_master_fd(struct steal_pty_state *steal);
-int get_pt();
+int get_pt(void);
 int get_process_tty_termios(pid_t pid, struct termios *tio);
 void move_process_group(struct ptrace_child *child, pid_t from, pid_t to);
 void copy_user(struct ptrace_child *d, struct ptrace_child *s);

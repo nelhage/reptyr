@@ -19,37 +19,48 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+
+#ifndef NT_ARM_SYSTEM_CALL
+#define NT_ARM_SYSTEM_CALL	0x404	/* ARM system call number */
+#endif
+
 static struct ptrace_personality arch_personality[1] = {
     {
-        offsetof(struct user_regs, uregs[0]),
-        offsetof(struct user_regs, uregs[0]),
-        offsetof(struct user_regs, uregs[1]),
-        offsetof(struct user_regs, uregs[2]),
-        offsetof(struct user_regs, uregs[3]),
-        offsetof(struct user_regs, uregs[4]),
-        offsetof(struct user_regs, uregs[5]),
-        offsetof(struct user_regs, ARM_pc),
+        offsetof(struct user_regs_struct, regs[0]),
+        offsetof(struct user_regs_struct, regs[0]),
+        offsetof(struct user_regs_struct, regs[1]),
+        offsetof(struct user_regs_struct, regs[2]),
+        offsetof(struct user_regs_struct, regs[3]),
+        offsetof(struct user_regs_struct, regs[4]),
+        offsetof(struct user_regs_struct, regs[5]),
+        offsetof(struct user_regs_struct, pc),
     }
 };
 
 static inline void arch_fixup_regs(struct ptrace_child *child) {
-    child->regs.ARM_pc -= 4;
+    child->regs.pc -= 4;
 }
 
 static inline int arch_set_syscall(struct ptrace_child *child,
                                    unsigned long sysno) {
-    return ptrace_command(child, PTRACE_SET_SYSCALL, 0, sysno);
+    int syscall_reg = sysno;
+    struct iovec reg_iovec = {
+        .iov_base = &syscall_reg,
+        .iov_len = sizeof(syscall_reg)
+    };
+    return ptrace_command(child, PTRACE_SETREGSET, NT_ARM_SYSTEM_CALL, &reg_iovec);
 }
 
 static inline int arch_save_syscall(struct ptrace_child *child) {
-    unsigned long swi;
-    swi = ptrace_command(child, PTRACE_PEEKTEXT, child->regs.ARM_pc);
-    if (child->error)
+    int syscall_reg;
+    struct iovec reg_iovec = {
+        .iov_base = &syscall_reg,
+        .iov_len = sizeof(syscall_reg)
+    };
+    if (ptrace_command(child, PTRACE_GETREGSET, NT_ARM_SYSTEM_CALL, &reg_iovec) < 0)
         return -1;
-    if (swi == 0xef000000)
-        child->saved_syscall = child->regs.uregs[7];
-    else
-        child->saved_syscall = (swi & 0x000fffff);
+
+    child->saved_syscall = syscall_reg;
     return 0;
 }
 
