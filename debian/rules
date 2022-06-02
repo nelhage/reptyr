@@ -12,6 +12,13 @@ override_dh_auto_install:
 	dh_auto_install -- PREFIX=/usr
 
 override_dh_auto_test:
-ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
-	PYTHON_CMD=python3 make test
-endif
+	# reptyr's test suite relies on being able to ptrace non-child
+	# processes, which isn't allowed under yama's defaults on Ubuntu
+	if [ -f /proc/sys/kernel/yama/ptrace_scope ] && \
+	  [ "$$(cat /proc/sys/kernel/yama/ptrace_scope)" != 0 ]; then \
+	  echo 'disabling tests (yama is enabled)'; \
+	elif ! [ -f /dev/tty0 ]; then \
+	  echo 'disabling tests (no TTY available)'; \
+	else \
+	  dh_auto_test -- PYTHON_CMD=python3; \
+	fi

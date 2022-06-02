@@ -4,6 +4,8 @@ reptyr (0.9.0-1) unstable; urgency=medium
   * New upstream release
     - Fixes FTBFS (due to test failure) on powerpc.
   * Use upstream detection of bash-completion install directory.
+  * Restore and cleanup logic to suppress tests in environments where
+    they will fail (such as Ubuntu).
 
  -- Evan Broder <evan@ebroder.net>  Wed, 15 Jun 2022 16:11:19 -0700
 
