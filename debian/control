@@ -3,6 +3,8 @@ Section: misc
 Priority: optional
 Maintainer: Evan Broder <evan@ebroder.net>
 Build-Depends: debhelper-compat (= 13),
+               pkg-config,
+               bash-completion,
                python3,
                python3-pexpect
 Standards-Version: 4.6.0
