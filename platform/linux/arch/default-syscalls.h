@@ -36,12 +36,12 @@
     .nr_dup2 = -1,
     SC(dup3),
 #endif
-#ifdef __NR_socketcall
-    SC(socketcall),
-#else
+#ifdef __NR_socket
     SC(socket),
     SC(connect),
     SC(sendmsg),
+#else
+    SC(socketcall),
 #endif
 },
 
