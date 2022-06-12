@@ -22,7 +22,7 @@
 
 static struct ptrace_personality arch_personality[1] = {
     {
-        offsetof(struct pt_regs, gpr[3]),
+        offsetof(struct pt_regs, result),
         offsetof(struct pt_regs, gpr[3]),
         offsetof(struct pt_regs, gpr[4]),
         offsetof(struct pt_regs, gpr[5]),
