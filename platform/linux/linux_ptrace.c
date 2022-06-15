@@ -84,6 +84,8 @@ static struct ptrace_personality *personality(struct ptrace_child *child);
 #include "arch/aarch64.h"
 #elif defined(__powerpc__)
 #include "arch/powerpc.h"
+#elif defined(__riscv) && __riscv_xlen == 64
+#include "arch/riscv64.h"
 #else
 #error Unsupported architecture.
 #endif
@@ -158,7 +160,8 @@ int ptrace_wait(struct ptrace_child *child) {
             child->state = (child->state == ptrace_at_syscall) ?
                            ptrace_after_syscall : ptrace_at_syscall;
         } else {
-            if (sig == SIGTRAP && (((child->status >> 8) & PTRACE_EVENT_FORK) == PTRACE_EVENT_FORK))
+            int event = child->status >> 16;
+            if (sig == SIGTRAP && event == PTRACE_EVENT_FORK)
                 ptrace_command(child, PTRACE_GETEVENTMSG, 0, &child->forked_pid);
             if (child->state != ptrace_at_syscall)
                 child->state = ptrace_stopped;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 by Nelson Elhage
+ * Copyright (C) 2021 by Ast-x64
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -19,33 +19,47 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-
 static struct ptrace_personality arch_personality[1] = {
     {
-        offsetof(struct pt_regs, result),
-        offsetof(struct pt_regs, gpr[3]),
-        offsetof(struct pt_regs, gpr[4]),
-        offsetof(struct pt_regs, gpr[5]),
-        offsetof(struct pt_regs, gpr[6]),
-        offsetof(struct pt_regs, gpr[7]),
-        offsetof(struct pt_regs, gpr[8]),
-        offsetof(struct pt_regs, nip),
+        offsetof(struct user_regs_struct, a0),
+        offsetof(struct user_regs_struct, a0),
+        offsetof(struct user_regs_struct, a1),
+        offsetof(struct user_regs_struct, a2),
+        offsetof(struct user_regs_struct, a3),
+        offsetof(struct user_regs_struct, a4),
+        offsetof(struct user_regs_struct, a5),
+        offsetof(struct user_regs_struct, pc),
     }
 };
 
-static const unsigned long r0off = offsetof(struct pt_regs, gpr[0]);
-
 static inline void arch_fixup_regs(struct ptrace_child *child) {
-    child->regs.nip -= 4;
+    child->regs.pc -= 4;
 }
 
 static inline int arch_set_syscall(struct ptrace_child *child,
                                    unsigned long sysno) {
-    return ptrace_command(child, PTRACE_POKEUSER, r0off, sysno);
+    unsigned long x_reg[18];
+    struct iovec reg_iovec = {
+        .iov_base = x_reg,
+        .iov_len = sizeof(x_reg)
+    };
+    if (ptrace_command(child, PTRACE_GETREGSET, NT_PRSTATUS, &reg_iovec) < 0)
+        return -1;
+
+    x_reg[17] = sysno;
+    return ptrace_command(child, PTRACE_SETREGSET, NT_PRSTATUS, &reg_iovec);
 }
 
 static inline int arch_save_syscall(struct ptrace_child *child) {
-    child->saved_syscall = *ptr(&child->regs, r0off);
+    unsigned long x_reg[18];
+    struct iovec reg_iovec = {
+        .iov_base = x_reg,
+        .iov_len = sizeof(x_reg)
+    };
+    if (ptrace_command(child, PTRACE_GETREGSET, NT_PRSTATUS, &reg_iovec) < 0)
+        return -1;
+
+    child->saved_syscall = x_reg[17];
     return 0;
 }
 

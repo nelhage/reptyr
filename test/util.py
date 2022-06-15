@@ -14,4 +14,4 @@ def expect_eof(fd):
   except OSError as e:
     if e.errno == errno.EIO:
       return
-    raise AssertionError("Expected EOF, other expection: {}".format(e))
+    raise AssertionError("Expected EOF, other exception: {}".format(e))

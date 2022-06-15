@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
     }
 #endif
 
-    while(getline(&line, &cap, stdin) != -1) {
+    while (getline(&line, &cap, stdin) != -1) {
         printf("ECHO: %s", line);
     }
 

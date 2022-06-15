@@ -41,22 +41,20 @@ static inline void arch_fixup_regs(struct ptrace_child *child) {
 	//https://lists.freebsd.org/pipermail/freebsd-hackers/2009-July/029206.html
 }
 
-static inline unsigned long arch_get_register(struct ptrace_child *child, unsigned long oft){
-	int ret;
+static inline unsigned long arch_get_register(struct ptrace_child *child, unsigned long oft) {
 	struct reg regs;
 
-	ret = ptrace_command(child, PT_GETREGS, &regs);
+	(void) ptrace_command(child, PT_GETREGS, &regs);
 
 	return *ptr(&regs,oft);
 }
 
-static inline void arch_set_register(struct ptrace_child *child, unsigned long oft, unsigned long val){
-	int ret;
+static inline void arch_set_register(struct ptrace_child *child, unsigned long oft, unsigned long val) {
 	struct reg regs;
 
-	ret = ptrace_command(child, PT_GETREGS, &regs);
+	(void) ptrace_command(child, PT_GETREGS, &regs);
 	*ptr(&regs,oft)=val;
-	ret = ptrace_command(child, PT_SETREGS, &regs);
+	(void) ptrace_command(child, PT_SETREGS, &regs);
 }
 
 static inline int arch_save_syscall(struct ptrace_child *child) {

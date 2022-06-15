@@ -1,35 +1,9 @@
-env:
-  CIRRUS_CLONE_DEPTH: 1
-
 freebsd_12_task:
   freebsd_instance:
-    image: freebsd-12-1-release-amd64
+    image: freebsd-12-2-release-amd64
   install_script:
-    pkg install -y gmake py27-pexpect
+    pkg install -y gmake py38-pexpect
   build_script:
     gmake
   test_script:
-    - env NO_TEST_BASIC=yes gmake test PYTHON_CMD=python2.7
-
-linux_gcc_py2_task:
-  container:
-    image: gcc:latest
-  install_script:
-    - apt-get update
-    - apt-get install -y python-prctl python-pexpect
-  build_script:
-    - make
-  test_script:
-    - make test
-
-linux_gcc_py3_task:
-  container:
-    image: gcc:latest
-  install_script:
-    - apt-get update
-    - apt-get install -y python3-prctl python3-pexpect
-  build_script:
-    - make
-  test_script:
-    - make test PYTHON_CMD=python3
-
+    - env NO_TEST_BASIC=yes gmake test PYTHON_CMD=python3.8
