@@ -13,7 +13,7 @@ Vcs-Git: https://github.com/nelhage/reptyr.git -b debian
 Vcs-Browser: https://github.com/nelhage/reptyr/tree/debian
 
 Package: reptyr
-Architecture: i386 amd64 armel armhf arm64 powerpc ppc64el
+Architecture: i386 amd64 armel armhf arm64 powerpc ppc64el riscv64
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Tool for moving running programs between ptys
  reptyr is a utility for taking an existing running program and

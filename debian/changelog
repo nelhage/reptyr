@@ -3,6 +3,7 @@ reptyr (0.9.0-1) unstable; urgency=medium
   * Acknowledge NMUs. (Thank you!)
   * New upstream release
     - Fixes FTBFS (due to test failure) on powerpc.
+    - Enable riscv64 build, which is now supported.
   * Use upstream detection of bash-completion install directory.
   * Restore and cleanup logic to suppress tests in environments where
     they will fail (such as Ubuntu).
