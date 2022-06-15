@@ -1,5 +1,0 @@
-files
-debhelper-build-stamp
-*.debhelper.log
-*.substvars
-reptyr
