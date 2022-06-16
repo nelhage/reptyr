@@ -21,9 +21,14 @@ a new Debian release, use
 to associate a particular tarball with a particular commit on the
 master branch.
 
-When using a git snapshot for a Debian release, use the
-github-generated download of the revision being snapshotted as the
-orig tarball. This tarball can be fetched from the URL:
+If using a released version of reptyr, you can use `uscan` to fetch the latest
+release:
+
+    uscan --force-download --rename
+
+If you need to use an untagged git revision, use the github-generated download
+of the revision being snapshotted as the orig tarball. This tarball can be
+fetched from the URL:
 
     https://github.com/nelhage/reptyr/tarball/COMMIT
 
