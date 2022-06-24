@@ -16,12 +16,12 @@ child = pexpect.spawn("test/victim")
 child.logfile = logfile
 child.setecho(False)
 child.sendline("hello")
-child.expect("ECHO: hello")
+child.expect("ECHO: hello\r\n")
 
 reptyr = pexpect.spawn("./reptyr -V %d" % (child.pid,))
 reptyr.logfile = logfile
 reptyr.sendline("world")
-reptyr.expect("ECHO: world")
+reptyr.expect("ECHO: world\r\n")
 
 child.sendline("final")
 expect_eof(child.child_fd)
