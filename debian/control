@@ -7,7 +7,7 @@ Build-Depends: debhelper-compat (= 13),
                bash-completion,
                python3,
                python3-pexpect
-Standards-Version: 4.6.0
+Standards-Version: 4.6.1
 Homepage: https://github.com/nelhage/reptyr
 Vcs-Git: https://github.com/nelhage/reptyr.git -b debian
 Vcs-Browser: https://github.com/nelhage/reptyr/tree/debian
