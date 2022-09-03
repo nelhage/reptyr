@@ -1,6 +1,8 @@
 reptyr (0.9.0-2) UNRELEASED; urgency=medium
 
   * Use secure copyright file specification URI.
+  * Set upstream metadata fields: Bug-Database, Bug-Submit, Repository,
+    Repository-Browse.
 
  -- Debian Janitor <janitor@jelmer.uk>  Sat, 03 Sep 2022 14:49:14 -0000
 
