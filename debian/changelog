@@ -1,3 +1,12 @@
+reptyr (0.9.0-2) UNRELEASED; urgency=medium
+
+  * Use secure copyright file specification URI.
+  * Set upstream metadata fields: Bug-Database, Bug-Submit, Repository,
+    Repository-Browse.
+  * Update standards version to 4.6.1, no changes needed.
+
+ -- Debian Janitor <janitor@jelmer.uk>  Sat, 03 Sep 2022 14:49:14 -0000
+
 reptyr (0.9.0-1) unstable; urgency=medium
 
   * Acknowledge NMUs. (Thank you!)
