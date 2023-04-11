@@ -71,6 +71,8 @@ static struct ptrace_personality *personality(struct ptrace_child *child);
 #include "arch/i386.h"
 #elif defined(__arm__)
 #include "arch/arm.h"
+#elif defined(__aarch64__)
+#include "arch/aarch64.h"
 #else
 #error Unsupported architecture.
 #endif
@@ -231,7 +233,7 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
     //if (arch_set_syscall(child, sysno) < 0)
     //return -1;
 
-    setreg(syscall_rv, sysno);
+    arch_set_syscall(child, sysno);
 
     setreg(syscall_arg0, p0);
     setreg(syscall_arg1, p1);
