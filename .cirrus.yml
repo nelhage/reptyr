@@ -1,9 +1,9 @@
 freebsd_12_task:
   freebsd_instance:
-    image: freebsd-12-2-release-amd64
+    image: freebsd-12-4-release-amd64
   install_script:
-    pkg install -y gmake py38-pexpect
+    pkg install -y gmake py39-pexpect
   build_script:
     gmake
   test_script:
-    - env NO_TEST_BASIC=yes gmake test PYTHON_CMD=python3.8
+    - gmake test PYTHON_CMD=python3.9
