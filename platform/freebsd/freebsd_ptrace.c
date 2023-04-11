@@ -71,6 +71,8 @@ static struct ptrace_personality *personality(struct ptrace_child *child);
 #include "arch/i386.h"
 #elif defined(__arm__)
 #include "arch/arm.h"
+#elif defined(__aarch64__)
+#include "arch/aarch64.h"
 #else
 #error Unsupported architecture.
 #endif
