@@ -70,6 +70,12 @@ static inline int arch_get_syscall(struct ptrace_child *child,
                           //sysno);
 }
 
+static inline int arch_set_syscall(struct ptrace_child *child,
+                                   unsigned long sysno) {
+    arch_set_register(child, x86_pers(child)->ax, sysno);
+    return 0;
+}
+
 static inline int arch_restore_syscall(struct ptrace_child *child) {
     return 0;
 }

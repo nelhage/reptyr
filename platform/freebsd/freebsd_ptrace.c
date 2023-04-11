@@ -231,7 +231,7 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
     //if (arch_set_syscall(child, sysno) < 0)
     //return -1;
 
-    setreg(syscall_rv, sysno);
+    arch_set_syscall(child, sysno);
 
     setreg(syscall_arg0, p0);
     setreg(syscall_arg1, p1);
