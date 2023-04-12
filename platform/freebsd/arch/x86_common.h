@@ -58,10 +58,9 @@ static inline int arch_get_syscall(struct ptrace_child *child,
 	return *ptr(&child->regs, personality(child)->syscall_rv);
 }
 
-static inline int arch_set_syscall(struct ptrace_child *child,
+static inline void arch_set_syscall(struct ptrace_child *child,
                                    unsigned long sysno) {
     arch_set_register(child, x86_pers(child)->ax, sysno);
-    return 0;
 }
 
 #undef ptr

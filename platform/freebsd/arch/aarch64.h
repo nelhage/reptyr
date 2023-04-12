@@ -49,10 +49,9 @@ static inline void arch_set_register(struct ptrace_child *child, unsigned long o
     (void)ptrace_command(child, PT_SETREGS, &regs);
 }
 
-static inline int arch_set_syscall(struct ptrace_child *child,
+static inline void arch_set_syscall(struct ptrace_child *child,
                                    unsigned long sysno) {
     arch_set_register(child, offsetof(struct reg, x[8]), sysno);
-    return 0;
 }
 
 #undef ptr

@@ -223,9 +223,6 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
         return -1;
 #define setreg(r, v) arch_set_register(child,personality(child)->r,v)
 
-    //if (arch_set_syscall(child, sysno) < 0)
-    //return -1;
-
     arch_set_syscall(child, sysno);
 
     setreg(syscall_arg0, p0);
