@@ -49,18 +49,9 @@ static inline void arch_set_register(struct ptrace_child *child, unsigned long o
     (void)ptrace_command(child, PT_SETREGS, &regs);
 }
 
-static inline int arch_save_syscall(struct ptrace_child *child) {
-    child->saved_syscall = child->regs.x[0];
-    return 0;
-}
-
 static inline int arch_set_syscall(struct ptrace_child *child,
                                    unsigned long sysno) {
     arch_set_register(child, offsetof(struct reg, x[8]), sysno);
-    return 0;
-}
-
-static inline int arch_restore_syscall(struct ptrace_child *child) {
     return 0;
 }
 

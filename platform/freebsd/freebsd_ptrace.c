@@ -202,19 +202,12 @@ int ptrace_save_regs(struct ptrace_child *child) {
         return -1;
     if (ptrace_command(child, PT_GETREGS, &child->regs, 0) < 0)
         return -1;
-    arch_save_syscall(child);
     arch_fixup_regs(child);
-    if (arch_save_syscall(child) < 0)
-        return -1;
     return 0;
 }
 
 int ptrace_restore_regs(struct ptrace_child *child) {
-    int err;
-    err = ptrace_command(child, PT_SETREGS, &child->regs, 0);
-    if (err < 0)
-        return err;
-    return arch_restore_syscall(child);
+    return ptrace_command(child, PT_SETREGS, &child->regs, 0);
 }
 
 unsigned long ptrace_remote_syscall(struct ptrace_child *child,

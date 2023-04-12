@@ -31,14 +31,10 @@ static inline struct x86_personality *x86_pers(struct ptrace_child *child) {
 }
 
 static inline void arch_fixup_regs(struct ptrace_child *child) {
-    struct x86_personality *x86pers = x86_pers(child);
     struct ptrace_personality *pers = personality(child);
     struct reg *regs = &child->regs;
 #define ptr(regs, off) ((unsigned long*)((void*)(regs)+(off)))
     *ptr(regs, pers->reg_ip) -= 2;
-    *ptr(regs, x86pers->ax) = child->saved_syscall;
-    //*ptr(user, x86pers->ax) = *ptr(user, x86pers->orig_ax);
-	//https://lists.freebsd.org/pipermail/freebsd-hackers/2009-July/029206.html
 }
 
 static inline unsigned long arch_get_register(struct ptrace_child *child, unsigned long oft) {
@@ -57,26 +53,14 @@ static inline void arch_set_register(struct ptrace_child *child, unsigned long o
 	(void) ptrace_command(child, PT_SETREGS, &regs);
 }
 
-static inline int arch_save_syscall(struct ptrace_child *child) {
-    child->saved_syscall = *ptr(&child->regs, x86_pers(child)->ax);
-    return 0;
-}
-
 static inline int arch_get_syscall(struct ptrace_child *child,
                                    unsigned long sysno) {
 	return *ptr(&child->regs, personality(child)->syscall_rv);
-    //return ptrace_command(child, PTRACE_POKEUSER,
-                          //x86_pers(child)->orig_ax,
-                          //sysno);
 }
 
 static inline int arch_set_syscall(struct ptrace_child *child,
                                    unsigned long sysno) {
     arch_set_register(child, x86_pers(child)->ax, sysno);
-    return 0;
-}
-
-static inline int arch_restore_syscall(struct ptrace_child *child) {
     return 0;
 }
 
