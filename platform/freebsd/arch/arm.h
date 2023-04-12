@@ -20,42 +20,44 @@
  * THE SOFTWARE.
  */
 
-#error ARM not yet supported for FreeBSD
+#include <machine/armreg.h>
 
 static struct ptrace_personality arch_personality[1] = {
     {
-        offsetof(struct user, regs.uregs[0]),
-        offsetof(struct user, regs.uregs[0]),
-        offsetof(struct user, regs.uregs[1]),
-        offsetof(struct user, regs.uregs[2]),
-        offsetof(struct user, regs.uregs[3]),
-        offsetof(struct user, regs.uregs[4]),
-        offsetof(struct user, regs.uregs[5]),
-        offsetof(struct user, regs.ARM_pc),
+        offsetof(struct reg, r[0]),
+        offsetof(struct reg, r[0]),
+        offsetof(struct reg, r[1]),
+        offsetof(struct reg, r[2]),
+        offsetof(struct reg, r[3]),
+        ~0UL,	/* Spill to stack */
+        ~0UL,	/* Spill to stack */
+        offsetof(struct reg, r_pc),
+        offsetof(struct reg, r_sp),
     }
 };
 
+#define ptr(regs, off) ((unsigned long*)((void*)(regs)+(off)))
+
 static inline void arch_fixup_regs(struct ptrace_child *child) {
-    child->user.regs.ARM_pc -= 4;
+    if ((child->regs.r_cpsr & PSR_T) != 0)
+        child->regs.r_pc -= THUMB_INSN_SIZE;
+    else
+        child->regs.r_pc -= INSN_SIZE;
+}
+
+static inline void arch_set_register(struct ptrace_child *child, unsigned long oft, unsigned long val)
+{
+    struct reg regs;
+
+    (void)ptrace_command(child, PT_GETREGS, &regs);
+    *ptr(&regs, oft) = val;
+    (void)ptrace_command(child, PT_SETREGS, &regs);
 }
 
 static inline int arch_set_syscall(struct ptrace_child *child,
                                    unsigned long sysno) {
-    return ptrace_command(child, PTRACE_SET_SYSCALL, 0, sysno);
-}
-
-static inline int arch_save_syscall(struct ptrace_child *child) {
-    unsigned long swi;
-    swi = ptrace_command(child, PTRACE_PEEKTEXT, child->user.regs.ARM_pc);
-    if (child->error)
-        return -1;
-    if (swi == 0xef000000)
-        child->saved_syscall = child->user.regs.uregs[7];
-    else
-        child->saved_syscall = (swi & 0x000fffff);
+    arch_set_register(child, offsetof(struct reg, r[7]), sysno);
     return 0;
 }
 
-static inline int arch_restore_syscall(struct ptrace_child *child) {
-    return arch_set_syscall(child, child->saved_syscall);
-}
+#undef ptr

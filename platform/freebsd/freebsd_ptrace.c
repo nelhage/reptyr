@@ -32,6 +32,7 @@
 #include <sys/syscall.h>
 #include <sys/mman.h>
 #include <assert.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <signal.h>
 
@@ -60,6 +61,7 @@ struct ptrace_personality {
     size_t syscall_arg4;
     size_t syscall_arg5;
     size_t reg_ip;
+    size_t reg_sp;
 };
 
 
@@ -202,19 +204,40 @@ int ptrace_save_regs(struct ptrace_child *child) {
         return -1;
     if (ptrace_command(child, PT_GETREGS, &child->regs, 0) < 0)
         return -1;
-    arch_save_syscall(child);
     arch_fixup_regs(child);
-    if (arch_save_syscall(child) < 0)
-        return -1;
     return 0;
 }
 
 int ptrace_restore_regs(struct ptrace_child *child) {
-    int err;
-    err = ptrace_command(child, PT_SETREGS, &child->regs, 0);
-    if (err < 0)
-        return err;
-    return arch_restore_syscall(child);
+    return ptrace_command(child, PT_SETREGS, &child->regs, 0);
+}
+
+static unsigned long ptrace_push_to_stack(struct ptrace_child *child,
+                                          unsigned long val)
+{
+    struct reg regs;
+    unsigned long *rsp, sp;
+    int rv;
+
+    /* XXX */
+    assert(val <= UINT_MAX);
+
+#define ptr(regs, off) ((unsigned long*)((void*)(regs)+(off)))
+    /* Grab the stack pointer */
+    (void)ptrace_command(child, PT_GETREGS, &regs);
+    rsp = ptr(&regs, personality(child)->reg_sp);
+    sp = *rsp - sizeof(int);
+
+    /* Splat the new value in */
+    rv = ptrace_command(child, PT_WRITE_D, sp, val);
+    if (rv != 0)
+        return -1;
+
+    /* And move the stack pointer. */
+    *rsp = sp;
+    rv = ptrace_command(child, PT_SETREGS, &regs);
+
+    return 0;
 }
 
 unsigned long ptrace_remote_syscall(struct ptrace_child *child,
@@ -226,21 +249,69 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
     struct ptrace_sc_ret psr;
 #endif
     unsigned long rv;
+    bool stack_used;
+
     if (ptrace_advance_to_state(child, ptrace_at_syscall) < 0)
         return -1;
 #define setreg(r, v) arch_set_register(child,personality(child)->r,v)
 
-    //if (arch_set_syscall(child, sysno) < 0)
-    //return -1;
-
+    stack_used = false;
     arch_set_syscall(child, sysno);
 
     setreg(syscall_arg0, p0);
     setreg(syscall_arg1, p1);
     setreg(syscall_arg2, p2);
     setreg(syscall_arg3, p3);
-    setreg(syscall_arg4, p4);
-    setreg(syscall_arg5, p5);
+    if (personality(child)->syscall_arg4 < sizeof(struct reg)) {
+        setreg(syscall_arg4, p4);
+    } else {
+        stack_used = true;
+
+        /*
+         * Pad out to eight arguments; this is not-so-secretly a kludge.  mmap's
+         * sixth argument is actually a 64-bit quantity, so the value should be
+         * split into two 32-bit quantities across the first two stack slots
+         * used.  However, we know in advance that we won't be needing the
+         * offset to do what we need to do, so we just pad out to eight
+         * arguments to maintain stack alignment and avoid garbage in the upper
+         * 32-bits of the offset.
+         */
+        rv = ptrace_push_to_stack(child, 0);
+        if (rv != 0)
+            return -1;
+        rv = ptrace_push_to_stack(child, 0);
+        if (rv != 0)
+            return -1;
+        rv = ptrace_push_to_stack(child, p5);
+        if (rv != 0)
+             return -1;
+        rv = ptrace_push_to_stack(child, p4);
+        if (rv != 0)
+             return -1;
+        assert(personality(child)->syscall_arg5 >= sizeof(struct reg));
+    }
+
+    if (!stack_used) {
+        if (personality(child)->syscall_arg5 < sizeof(struct reg)) {
+            setreg(syscall_arg5, p5);
+        } else  {
+            /* Only done if p4 wasn't pushed to the stack. */
+            stack_used = true;
+            /* Pad out to eight arguments, see above */
+            rv = ptrace_push_to_stack(child, 0);
+            if (rv != 0)
+                return -1;
+            rv = ptrace_push_to_stack(child, 0);
+            if (rv != 0)
+                return -1;
+            rv = ptrace_push_to_stack(child, 0);
+            if (rv != 0)
+                return -1;
+            rv = ptrace_push_to_stack(child, p5);
+            if (rv != 0)
+                return -1;
+        }
+    }
 
     if (ptrace_advance_to_state(child, ptrace_after_syscall) < 0)
         return -1;
