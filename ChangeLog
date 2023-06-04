@@ -1,3 +1,6 @@
+* 0.10.0 (Jun 04, 2023)
+ - Add arm7 and aarch64 support for FreeBSD
+
 * 0.9.0 (Jun 12, 2022)
  - Add RISCV64 support on Linux
  - Fix tty-stealing on PowerPC
