@@ -29,4 +29,4 @@ version="$version" perl -i -lape '/^#define REPTYR_VERSION/ && s/".*"/"$ENV{vers
 git add ChangeLog reptyr.h
 
 git commit -m "reptyr $version"
-git tag "reptyr-$version" -m "reptyr $version" -s
+git tag "reptyr-$version" -m "reptyr $version"
