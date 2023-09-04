@@ -20,7 +20,7 @@ jobs:
           - python2
           - python3
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           persist-credentials: false
       - run: apt-get update && apt-get -y install gcc-multilib libcap-dev gcc ${{matrix.python}} virtualenv ${{matrix.python}}-dev make
