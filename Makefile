@@ -41,7 +41,7 @@ test/victim: override LDFLAGS := $(VICTIM_LDFLAGS)
 clean:
 	rm -f reptyr $(OBJS) test/victim.o test/victim $(DEPS)
 
-BASHCOMPDIR ?= $(shell $(PKG_CONFIG) --variable=completionsdir bash-completion 2>/dev/null)
+BASHCOMPDIR ?= $(shell $(PKG_CONFIG) --variable=completionsdir bash-completion 2>/dev/null | sed -e 's,/usr,$(PREFIX),')
 
 install: reptyr
 	install -d -m 755 $(DESTDIR)$(BINDIR)
