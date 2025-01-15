@@ -41,7 +41,7 @@ test/victim: override LDFLAGS := $(VICTIM_LDFLAGS)
 clean:
 	rm -f reptyr $(OBJS) test/victim.o test/victim $(DEPS)
 
-BASHCOMPDIR ?= $(shell $(PKG_CONFIG) --variable=completionsdir bash-completion 2>/dev/null | sed -e 's,/usr,$(PREFIX),')
+BASHCOMPDIR ?= $PREFIX/share/bash-completion/completions/
 
 install: reptyr
 	install -d -m 755 $(DESTDIR)$(BINDIR)
@@ -50,10 +50,8 @@ install: reptyr
 	install -m 644 reptyr.1 $(DESTDIR)$(MANDIR)/man1/reptyr.1
 	install -d -m 755 $(DESTDIR)$(MANDIR)/fr/man1
 	install -m 644 reptyr.fr.1 $(DESTDIR)$(MANDIR)/fr/man1/reptyr.1
-	bashcompdir=$(BASHCOMPDIR) ; \
-	test -z "$$bashcompdir" && bashcompdir=/etc/bash_completion.d ; \
-	install -d -m 755 $(DESTDIR)$$bashcompdir ; \
-	install -m 644 reptyr.bash $(DESTDIR)$$bashcompdir/reptyr
+	install -d -m 755 $(DESTDIR)$(BASHCOMPDIR) ; \
+	install -m 644 reptyr.bash $(DESTDIR)$(BASHCOMPDIR)/reptyr
 
 .PHONY: PHONY
 
