@@ -9,6 +9,9 @@ ifeq ($(UNAME_S),FreeBSD)
 	OBJS += platform/freebsd/freebsd_ptrace.o platform/freebsd/freebsd.o
 	LDFLAGS += -lprocstat
 endif
+ifeq ($(UNAME_S),Darwin)
+	OBJS += platform/darwin/darwin_ptrace.o platform/darwin/darwin.o platform/darwin/darwin_attach.o
+endif
 # Note that because of how Make works, this can be overridden from the
 # command-line.
 #
@@ -26,8 +29,13 @@ reptyr: $(OBJS)
 
 ifeq ($(DISABLE_TESTS),)
 test: reptyr test/victim PHONY
-	$(PYTHON_CMD) test/basic.py
-	$(PYTHON_CMD) test/tty-steal.py
+	$(PYTHON_CMD) test/list-pty.py
+	@if [ "$(UNAME_S)" = "Darwin" ]; then \
+		echo "Skipping Linux/FreeBSD ptrace attach tests on macOS; run 'make darwin-attach-test PYTHON_CMD=python3' for the experimental Darwin backend."; \
+	else \
+		$(PYTHON_CMD) test/basic.py; \
+		$(PYTHON_CMD) test/tty-steal.py; \
+	fi
 else
 test: all
 endif
@@ -38,8 +46,15 @@ test/victim: test/victim.o
 test/victim: override CFLAGS := $(VICTIM_CFLAGS)
 test/victim: override LDFLAGS := $(VICTIM_LDFLAGS)
 
+test/darwin-victim: test/darwin-victim.o
+test/darwin-victim: override CFLAGS := $(VICTIM_CFLAGS)
+test/darwin-victim: override LDFLAGS := $(VICTIM_LDFLAGS)
+
+darwin-attach-test: reptyr test/darwin-victim PHONY
+	$(PYTHON_CMD) test/darwin-basic.py
+
 clean:
-	rm -f reptyr $(OBJS) test/victim.o test/victim $(DEPS)
+	rm -f reptyr $(OBJS) test/victim.o test/victim test/darwin-victim.o test/darwin-victim $(DEPS)
 
 BASHCOMPDIR ?= $PREFIX/share/bash-completion/completions/
 

@@ -58,7 +58,22 @@ PORTABILITY
 
 reptyr supports Linux and FreeBSD. Not all functionality is currently
 available on FreeBSD. (Notably, FreeBSD doesn't support `reptyr -T` at
-this time.
+this time.)
+
+macOS currently has partial support: `reptyr -l` and `reptyr -L` build
+and work, and an experimental Darwin backend supports `reptyr PID` and
+`reptyr -s PID` for same-user, debug-attachable arm64 targets. The Darwin
+attach path uses Mach task/thread APIs to temporarily hijack one target
+thread and run an arm64 syscall payload that opens the new pty and
+`dup2()`s it onto the target's tty fds. With `-s`, it redirects stdio fds
+0-2 directly.
+
+This is not full Linux/FreeBSD parity yet. `reptyr -T` is not implemented,
+Darwin attach is arm64-only, and targets may need ad-hoc signing with
+`com.apple.security.get-task-allow` or equivalent local debug permission
+for `task_for_pid()` to succeed. Programs that exit on an
+interrupted/aborted blocking read may still terminate during attach;
+interactive programs that retry reads are the expected first target class.
 
 `reptyr` uses ptrace to attach to the target and control it at the
 syscall level, so it is highly dependent on details of the syscall
@@ -103,6 +118,10 @@ actually changes the controlling terminal of the process you are
 attaching. I wrote a
 [blog post](https://blog.nelhage.com/2011/02/changing-ctty/)
 explaining just what the shenanigans involved are.
+
+The experimental macOS backend is not there yet: it redirects the target's
+open tty fds to the new pty, but does not currently change the target's
+controlling terminal or session state.
 
 PRONUNCIATION
 -------------

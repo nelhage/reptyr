@@ -267,6 +267,9 @@ int preflight_check(pid_t pid) {
 }
 
 int attach_child(pid_t pid, const char *pty, int force_stdio) {
+#ifdef __APPLE__
+    return darwin_attach_child(pid, pty, force_stdio);
+#else
     struct ptrace_child child;
     child_addr_t scratch_page = -1;
     int *child_tty_fds = NULL, n_fds, child_fd, statfd = -1;
@@ -400,6 +403,7 @@ out_cont:
 #endif
 
     return err < 0 ? -err : err;
+#endif
 }
 
 int setup_steal_socket(struct steal_pty_state *steal) {

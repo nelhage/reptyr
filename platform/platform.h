@@ -23,12 +23,9 @@
 #ifndef PLATFORM_H
 #define PLATFORM_H
 
-#ifdef __APPLE__
-#error "reptyr does not currently support macOS"
-#endif
-
 #include "linux/linux.h"
 #include "freebsd/freebsd.h"
+#include "darwin/darwin.h"
 #include "../ptrace.h"
 
 struct fd_array {

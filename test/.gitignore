@@ -1,3 +1,5 @@
 victim.o
 victim
+darwin-victim.o
+darwin-victim
 *.pyc

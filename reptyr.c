@@ -74,16 +74,17 @@ void error(const char *msg, ...) {
     va_end(ap);
 }
 
-void setup_raw(struct termios *save) {
+int setup_raw(struct termios *save) {
     struct termios set;
     if (tcgetattr(0, save) < 0) {
-        fprintf(stderr, "Unable to read terminal attributes: %m");
-        return;
+        fprintf(stderr, "Unable to read terminal attributes: %s\n", strerror(errno));
+        return 0;
     }
     set = *save;
     cfmakeraw(&set);
     if (tcsetattr(0, TCSANOW, &set) < 0)
-        die("Unable to set terminal attributes: %m");
+        die("Unable to set terminal attributes: %s", strerror(errno));
+    return 1;
 }
 
 void resize_pty(int pty) {
@@ -133,7 +134,7 @@ void do_proxy(int pty) {
     sigemptyset(&mask);
     sigaddset(&mask, SIGWINCH);
     if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1) {
-        fprintf(stderr, "sigprocmask: %m");
+        fprintf(stderr, "sigprocmask: %s", strerror(errno));
         return;
     }
     sa.sa_handler = do_winch;
@@ -154,7 +155,7 @@ void do_proxy(int pty) {
         if (pselect(pty + 1, &set, NULL, NULL, NULL, &select_mask) < 0) {
             if (errno == EINTR)
                 continue;
-            fprintf(stderr, "select: %m");
+            fprintf(stderr, "select: %s", strerror(errno));
             return;
         }
         if (FD_ISSET(0, &set)) {
@@ -197,6 +198,7 @@ int main(int argc, char **argv) {
     int force_stdio = 0;
     int do_steal = 0;
     int unattached_script_redirection = 0;
+    int restore_termios = 0;
 
     while ((opt = getopt(argc, argv, "hlLsTvV")) != -1) {
         switch (opt) {
@@ -239,11 +241,11 @@ int main(int argc, char **argv) {
 
     if (!do_steal) {
         if ((pty = get_pt()) < 0)
-            die("Unable to allocate a new pseudo-terminal: %m");
+            die("Unable to allocate a new pseudo-terminal: %s", strerror(errno));
         if (unlockpt(pty) < 0)
-            die("Unable to unlockpt: %m");
+            die("Unable to unlockpt: %s", strerror(errno));
         if (grantpt(pty) < 0)
-            die("Unable to grantpt: %m");
+            die("Unable to grantpt: %s", strerror(errno));
     }
 
     if (do_attach) {
@@ -251,7 +253,7 @@ int main(int argc, char **argv) {
         errno = 0;
         long t = strtol(argv[optind], &endptr, 10);
         if (errno == ERANGE)
-            die("Invalid pid: %m");
+            die("Invalid pid: %s", strerror(errno));
         if (*endptr)
             die("Invalid pid: must be integer");
         /* check for overflow/underflow */
@@ -266,7 +268,11 @@ int main(int argc, char **argv) {
         }
         if (err) {
             fprintf(stderr, "Unable to attach to pid %d: %s\n", child, strerror(err));
-            if (err == EPERM) {
+            if (err == EPERM
+#ifdef __APPLE__
+                || err == ENOTSUP
+#endif
+            ) {
                 check_ptrace_scope();
             }
             return 1;
@@ -296,13 +302,15 @@ int main(int argc, char **argv) {
         }
     }
 
-    setup_raw(&saved_termios);
+    restore_termios = setup_raw(&saved_termios);
     do_proxy(pty);
-    do {
-        errno = 0;
-        if (tcsetattr(0, TCSANOW, &saved_termios) && errno != EINTR)
-            die("Unable to tcsetattr: %m");
-    } while (errno == EINTR);
+    if (restore_termios) {
+        do {
+            errno = 0;
+            if (tcsetattr(0, TCSANOW, &saved_termios) && errno != EINTR)
+                die("Unable to tcsetattr: %s", strerror(errno));
+        } while (errno == EINTR);
+    }
 
     return 0;
 }
