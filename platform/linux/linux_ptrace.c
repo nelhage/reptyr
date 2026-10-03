@@ -86,6 +86,8 @@ static struct ptrace_personality *personality(struct ptrace_child *child);
 #include "arch/powerpc.h"
 #elif defined(__riscv) && __riscv_xlen == 64
 #include "arch/riscv64.h"
+#elif defined(__loongarch__)
+#include "arch/loongarch.h"
 #else
 #error Unsupported architecture.
 #endif
