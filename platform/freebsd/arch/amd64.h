@@ -30,8 +30,12 @@ static struct ptrace_personality arch_personality[2] = {
         offsetof(struct reg, r_rdi),
         offsetof(struct reg, r_rsi),
         offsetof(struct reg, r_rdx),
-        offsetof(struct reg, r_rcx),
-        //offsetof(struct reg, r_r10),
+        /*
+         * The syscall instruction takes the fourth argument in %r10. The
+         * kernel copies it to %rcx on entry, but we always inject syscalls
+         * by executing the instruction afresh, so set %r10.
+         */
+        offsetof(struct reg, r_r10),
         offsetof(struct reg, r_r8),
         offsetof(struct reg, r_r9),
         offsetof(struct reg, r_rip),

@@ -36,8 +36,8 @@ static struct ptrace_personality arch_personality[1] = {
 
 #define ptr(regs, off) ((unsigned long*)((void*)(regs)+(off)))
 
-static inline void arch_fixup_regs(struct ptrace_child *child) {
-    child->regs.elr -= 4;
+static inline void arch_fixup_regs(struct ptrace_child *child, struct reg *regs) {
+    regs->elr -= 4;
 }
 
 static inline void arch_set_register(struct ptrace_child *child, unsigned long oft, unsigned long val)

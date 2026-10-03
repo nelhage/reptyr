@@ -321,6 +321,7 @@ void move_process_group(struct ptrace_child *child, pid_t from, pid_t to) {
 
 void copy_user(struct ptrace_child *d, struct ptrace_child *s) {
     memcpy(&d->regs, &s->regs, sizeof(s->regs));
+    d->syscall_insn = s->syscall_insn;
 }
 
 #endif

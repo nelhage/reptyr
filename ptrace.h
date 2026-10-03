@@ -84,6 +84,8 @@ struct ptrace_child {
 #endif
 #elif defined(__FreeBSD__)
 	struct reg regs;
+	/* Address of a syscall instruction in the child, for injecting syscalls. */
+	unsigned long syscall_insn;
 #endif
 };
 
