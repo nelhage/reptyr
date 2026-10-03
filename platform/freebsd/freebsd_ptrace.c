@@ -136,12 +136,21 @@ int ptrace_detach_child(struct ptrace_child *child) {
     return 0;
 }
 
-int ptrace_wait(struct ptrace_child *child) {
+/*
+ * Wait for the child to stop. Returns 0 once it has stopped or exited, 1 if
+ * WNOHANG was passed and it hasn't yet, and -1 on error.
+ */
+static int __ptrace_wait(struct ptrace_child *child, int options) {
     struct ptrace_lwpinfo lwpinfo;
-    if (waitpid(child->pid, &child->status, 0) < 0) {
+    pid_t pid;
+
+    pid = waitpid(child->pid, &child->status, options);
+    if (pid < 0) {
         child->error = errno;
         return -1;
     }
+    if (pid == 0)
+        return 1;
     if (WIFEXITED(child->status) || WIFSIGNALED(child->status)) {
         child->state = ptrace_exited;
     } else if (WIFSTOPPED(child->status)) {
@@ -160,9 +169,100 @@ int ptrace_wait(struct ptrace_child *child) {
     return 0;
 }
 
+int ptrace_wait(struct ptrace_child *child) {
+    return __ptrace_wait(child, 0);
+}
+
+#ifndef ERESTART
+#define ERESTART    (-1)
+#endif
+#ifndef EJUSTRETURN
+#define EJUSTRETURN (-2)
+#endif
+
+/*
+ * Since FreeBSD 13, PT_ATTACH is "transparent": it does not interrupt a
+ * thread that is sleeping in a syscall, so waiting for the child's next
+ * syscall can hang indefinitely. Some releases also discard register
+ * changes made at a syscall-entry stop when the child is resumed, so we
+ * can't inject a syscall by rewriting the one the child is about to make.
+ *
+ * Instead, we inject syscalls only from syscall-exit stops, by pointing the
+ * PC back at a syscall instruction and running to the next syscall exit.
+ * To get to the first one, if the child doesn't reach a syscall exit
+ * promptly we kick it with SIGSTOP. That interrupts an interruptible sleep
+ * with ERESTART, so the kernel rewinds the interrupted syscall to be
+ * restarted once we restore the registers and let the child go. The
+ * SIGSTOP itself is discarded when it is reported to us.
+ */
+static int ptrace_to_syscall_exit(struct ptrace_child *child) {
+#ifdef PT_GET_SC_RET
+    struct ptrace_sc_ret psr;
+#endif
+    struct reg regs;
+    int i, err;
+
+    while (1) {
+        if (child->state == ptrace_after_syscall && child->syscall_insn)
+            return 0;
+        if (child->state == ptrace_exited) {
+            child->error = ESRCH;
+            return -1;
+        }
+        if (WIFSTOPPED(child->status) && WSTOPSIG(child->status) == SIGSEGV) {
+            child->error = EAGAIN;
+            return -1;
+        }
+
+        if (ptrace_command(child, PT_TO_SCX, (caddr_t)1, 0) < 0)
+            return -1;
+        err = 1;
+        for (i = 0; i < 10 && err == 1; i++) {
+            struct timespec ts = { .tv_sec = 0, .tv_nsec = 10 * 1000 * 1000 };
+            if ((err = __ptrace_wait(child, WNOHANG)) == 1)
+                nanosleep(&ts, NULL);
+        }
+        if (err == 1) {
+            kill(child->pid, SIGSTOP);
+            err = ptrace_wait(child);
+        }
+        if (err < 0)
+            return -1;
+
+        if (child->state != ptrace_after_syscall)
+            continue;
+
+        if (ptrace_command(child, PT_GETREGS, &regs) < 0)
+            return -1;
+        /*
+         * The syscall's return set the PC: after the syscall instruction, or
+         * back on it if the syscall is to be restarted. A syscall returning
+         * EJUSTRETURN (e.g. sigreturn) put it somewhere else entirely, so
+         * wait for the next one.
+         */
+#ifdef PT_GET_SC_RET
+        if (ptrace_command(child, PT_GET_SC_RET, &psr, sizeof(psr)) < 0)
+            return -1;
+        if (psr.sr_error == EJUSTRETURN) {
+            child->state = ptrace_stopped;
+            continue;
+        }
+        if (psr.sr_error != ERESTART)
+#endif
+            arch_fixup_regs(child, &regs);
+        child->syscall_insn = *(unsigned long*)((void*)&regs +
+                                                personality(child)->reg_ip);
+    }
+}
+
 int ptrace_advance_to_state(struct ptrace_child *child,
                             enum child_state desired) {
     int err;
+
+    /* See ptrace_to_syscall_exit; this is where we can inject syscalls. */
+    if (desired == ptrace_at_syscall)
+        return ptrace_to_syscall_exit(child);
+
     while (child->state != desired) {
         switch (desired) {
         case ptrace_after_syscall:
@@ -171,13 +271,6 @@ int ptrace_advance_to_state(struct ptrace_child *child,
                 return -1;
             }
             err = ptrace_command(child, PT_TO_SCX, (caddr_t)1, 0);
-            break;
-        case ptrace_at_syscall:
-            if (WIFSTOPPED(child->status) && WSTOPSIG(child->status) == SIGSEGV) {
-                child->error = EAGAIN;
-                return -1;
-            }
-            err = ptrace_command(child, PT_TO_SCE, (caddr_t)1, 0);
             break;
         case ptrace_running:
             return ptrace_command(child, PT_CONTINUE, (caddr_t)1, 0);
@@ -199,12 +292,15 @@ int ptrace_advance_to_state(struct ptrace_child *child,
 }
 
 
+/*
+ * Save the registers at a syscall exit. Restoring them lets the child carry
+ * on as if returning from that syscall, or restart it if it was interrupted.
+ */
 int ptrace_save_regs(struct ptrace_child *child) {
-    if (ptrace_advance_to_state(child, ptrace_at_syscall) < 0)
+    if (ptrace_to_syscall_exit(child) < 0)
         return -1;
     if (ptrace_command(child, PT_GETREGS, &child->regs, 0) < 0)
         return -1;
-    arch_fixup_regs(child);
     return 0;
 }
 
@@ -250,8 +346,16 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
 #endif
     unsigned long rv;
     bool stack_used;
+    struct reg regs;
 
-    if (ptrace_advance_to_state(child, ptrace_at_syscall) < 0)
+    if (ptrace_to_syscall_exit(child) < 0)
+        return -1;
+
+    /* Start from the saved registers, with the PC on a syscall instruction. */
+    regs = child->regs;
+    *(unsigned long*)((void*)&regs + personality(child)->reg_ip) =
+        child->syscall_insn;
+    if (ptrace_command(child, PT_SETREGS, &regs) < 0)
         return -1;
 #define setreg(r, v) arch_set_register(child,personality(child)->r,v)
 
@@ -313,6 +417,8 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
         }
     }
 
+    /* Run the syscall instruction through to the syscall's exit. */
+    child->state = ptrace_stopped;
     if (ptrace_advance_to_state(child, ptrace_after_syscall) < 0)
         return -1;
 
@@ -338,9 +444,6 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
     else
         rv = psr.sr_retval[0];
 #endif
-    setreg(reg_ip, *(unsigned long*)((void*)&child->regs +
-                                     personality(child)->reg_ip));
-
 #undef setreg
 
     return rv;

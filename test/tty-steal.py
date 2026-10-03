@@ -1,3 +1,4 @@
+import errno
 import pexpect
 import os
 import sys
@@ -17,10 +18,15 @@ try:
     import prctl
     PR_SET_PTRACER_ANY = 0xffffffff
     if hasattr(prctl, 'set_ptracer'):
-        did_prctl = True
         prctl.set_ptracer(PR_SET_PTRACER_ANY)
+        did_prctl = True
 except ImportError:
     pass
+except OSError as e:
+    # EINVAL means the kernel has no Yama LSM, so there is no ptrace
+    # restriction to lift.
+    if e.errno != errno.EINVAL:
+        raise
 
 if not did_prctl:
   print("Unable to find `prctl.set_ptracer`, skipping `PR_SET_PTRACER`.")

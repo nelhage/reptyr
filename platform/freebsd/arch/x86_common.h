@@ -30,10 +30,11 @@ static inline struct x86_personality *x86_pers(struct ptrace_child *child) {
     return &x86_personality[child->personality];
 }
 
-static inline void arch_fixup_regs(struct ptrace_child *child) {
-    struct ptrace_personality *pers = personality(child);
-    struct reg *regs = &child->regs;
 #define ptr(regs, off) ((unsigned long*)((void*)(regs)+(off)))
+
+/* Rewind the PC over the syscall instruction that was just executed. */
+static inline void arch_fixup_regs(struct ptrace_child *child, struct reg *regs) {
+    struct ptrace_personality *pers = personality(child);
     *ptr(regs, pers->reg_ip) -= 2;
 }
 

@@ -38,11 +38,11 @@ static struct ptrace_personality arch_personality[1] = {
 
 #define ptr(regs, off) ((unsigned long*)((void*)(regs)+(off)))
 
-static inline void arch_fixup_regs(struct ptrace_child *child) {
-    if ((child->regs.r_cpsr & PSR_T) != 0)
-        child->regs.r_pc -= THUMB_INSN_SIZE;
+static inline void arch_fixup_regs(struct ptrace_child *child, struct reg *regs) {
+    if ((regs->r_cpsr & PSR_T) != 0)
+        regs->r_pc -= THUMB_INSN_SIZE;
     else
-        child->regs.r_pc -= INSN_SIZE;
+        regs->r_pc -= INSN_SIZE;
 }
 
 static inline void arch_set_register(struct ptrace_child *child, unsigned long oft, unsigned long val)
