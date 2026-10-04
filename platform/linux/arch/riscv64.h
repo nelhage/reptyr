@@ -19,6 +19,16 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+/*
+ * On syscall entry the kernel copies a0 into orig_a0, which it then
+ * reads the first syscall argument from, and clobbers a0 with -ENOSYS
+ * before the syscall-entry stop. ptrace can't write orig_a0, so we
+ * can't change the first argument of a syscall that has already been
+ * entered; instead, set up the registers at a syscall-exit stop and
+ * have the child re-execute the ecall.
+ */
+#define ARCH_SET_SYSCALL_ARGS_BEFORE_ENTRY
+
 static struct ptrace_personality arch_personality[1] = {
     {
         offsetof(struct user_regs_struct, a0),
@@ -60,6 +70,14 @@ static inline int arch_save_syscall(struct ptrace_child *child) {
         return -1;
 
     child->saved_syscall = x_reg[17];
+
+#ifdef PTRACE_GET_SYSCALL_INFO
+    /* Recover the original a0 so the syscall is restarted correctly. */
+    struct __ptrace_syscall_info info;
+    if (ptrace_command(child, PTRACE_GET_SYSCALL_INFO, sizeof(info), &info) > 0 &&
+        info.op == PTRACE_SYSCALL_INFO_ENTRY)
+        child->regs.a0 = info.entry.args[0];
+#endif
     return 0;
 }
 

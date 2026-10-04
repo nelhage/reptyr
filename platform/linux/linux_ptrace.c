@@ -242,8 +242,24 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
                                     unsigned long p2, unsigned long p3,
                                     unsigned long p4, unsigned long p5) {
     unsigned long rv;
+#ifdef ARCH_SET_SYSCALL_ARGS_BEFORE_ENTRY
+    /*
+     * Cancel any syscall the child is entering, so that we can set up
+     * our syscall at the exit stop and re-execute the syscall
+     * instruction below.
+     */
+    if (child->state != ptrace_after_syscall) {
+        if (ptrace_advance_to_state(child, ptrace_at_syscall) < 0)
+            return -1;
+        if (arch_set_syscall(child, -1) < 0)
+            return -1;
+        if (ptrace_advance_to_state(child, ptrace_after_syscall) < 0)
+            return -1;
+    }
+#else
     if (ptrace_advance_to_state(child, ptrace_at_syscall) < 0)
         return -1;
+#endif
 
     if (arch_set_syscall(child, sysno) < 0)
         return -1;
@@ -266,9 +282,17 @@ unsigned long ptrace_remote_syscall(struct ptrace_child *child,
     setreg(syscall_arg3, p3);
     setreg(syscall_arg4, p4);
     setreg(syscall_arg5, p5);
+#ifdef ARCH_SET_SYSCALL_ARGS_BEFORE_ENTRY
+    setreg(reg_ip, *(unsigned long*)((void*)&child->regs + personality(child)->reg_ip));
+#endif
 
     if (ptrace_command(child, PTRACE_SETREGSET, NT_PRSTATUS, &reg_iovec) < 0)
         return -1;
+
+#ifdef ARCH_SET_SYSCALL_ARGS_BEFORE_ENTRY
+    if (ptrace_advance_to_state(child, ptrace_at_syscall) < 0)
+        return -1;
+#endif
 
     if (ptrace_advance_to_state(child, ptrace_after_syscall) < 0)
         return -1;

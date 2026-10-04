@@ -1,7 +1,12 @@
+/*
+ * The kernel copies a0 into orig_a0 on syscall entry and clobbers a0
+ * with -ENOSYS before the syscall-entry stop; the first syscall
+ * argument is then read from orig_a0, which is part of NT_PRSTATUS.
+ */
 static struct ptrace_personality arch_personality[1] = {
     {
         offsetof(struct user_regs_struct, regs[4]),
-        offsetof(struct user_regs_struct, regs[4]),
+        offsetof(struct user_regs_struct, orig_a0),
         offsetof(struct user_regs_struct, regs[5]),
         offsetof(struct user_regs_struct, regs[6]),
         offsetof(struct user_regs_struct, regs[7]),
@@ -13,6 +18,8 @@ static struct ptrace_personality arch_personality[1] = {
 
 static inline void arch_fixup_regs(struct ptrace_child *child) {
     child->regs.csr_era -= 4;
+    /* Restore the original a0 so the syscall is restarted correctly. */
+    child->regs.regs[4] = child->regs.orig_a0;
 }
 
 static inline int arch_set_syscall(struct ptrace_child *child,
