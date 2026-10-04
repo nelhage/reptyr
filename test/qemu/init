@@ -1,0 +1,20 @@
+#!/bin/sh
+# PID 1 inside the test VM: mount the basic filesystems, run the test
+# suite, report the result on the console and power off.
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+export HOME=/root
+
+busybox mount -t proc proc /proc
+busybox mount -t sysfs sysfs /sys
+busybox mount -t devtmpfs devtmpfs /dev
+busybox mkdir -p /dev/pts
+busybox mount -t devpts -o ptmxmode=0666 devpts /dev/pts
+busybox mount -t tmpfs tmpfs /tmp
+
+uname -a
+cd /src || exit 1
+make CC=gcc PYTHON_CMD=python3 test
+echo "reptyr-qemu-result: $?"
+
+busybox sync
+busybox poweroff -f
