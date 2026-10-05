@@ -79,7 +79,8 @@ kernel=$(ls "$root"/boot/vmlinu[xz]-* "$root"/usr/lib/modules/*/vmlinu[xz] 2>/de
 
 rm -rf "$root/src"
 mkdir "$root/src"
-(cd "$src" && git -c safe.directory="$src" ls-files -z | cpio --null -pdm --quiet "$root/src")
+(cd "$src" && git -c safe.directory="$src" ls-files -z) > "$work/files"
+(cd "$src" && cpio --null -pdm --quiet "$root/src") < "$work/files"
 cp "$src/test/qemu/init" "$root/init"
 
 # Leave the kernel image and modules out of the initramfs.

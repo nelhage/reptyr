@@ -56,10 +56,12 @@ jobs:
           - arch: loong64
             packages: qemu-system-misc qemu-efi-loongarch64
     steps:
+      # Install git before checking out, so that we get a real git
+      # checkout for run.sh to list files from.
+      - run: apt-get update && apt-get -y install --no-install-recommends mmdebstrap debian-archive-keyring ca-certificates cpio git ${{ matrix.packages }}
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - run: apt-get update && apt-get -y install --no-install-recommends mmdebstrap debian-archive-keyring ca-certificates cpio git ${{ matrix.packages }}
       - run: test/qemu/run.sh ${{ matrix.arch }}
 
   freebsd:
