@@ -16,7 +16,8 @@ if sys.version_info[0] >= 3:
 did_prctl = False
 try:
     import prctl
-    PR_SET_PTRACER_ANY = 0xffffffff
+    # ((unsigned long)-1); python-prctl passes this as a C long.
+    PR_SET_PTRACER_ANY = -1
     if hasattr(prctl, 'set_ptracer'):
         prctl.set_ptracer(PR_SET_PTRACER_ANY)
         did_prctl = True

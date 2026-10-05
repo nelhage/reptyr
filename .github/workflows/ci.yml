@@ -36,6 +36,34 @@ jobs:
       - if: matrix.arch == 'amd64'
         run: . venv/bin/activate && env PYTHON_CMD=python3 CFLAGS=-m32 LDFLAGS=-m32 NO_TEST_STEAL=1 make test
 
+  # Architectures without native runners. qemu-user can't emulate
+  # ptrace, so these boot a Debian kernel under qemu-system.
+  linux-qemu:
+    runs-on: ubuntu-latest
+    container: debian:trixie
+    name: "Debian (${{ matrix.arch }}, QEMU)"
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: armhf
+            packages: qemu-system-arm
+          - arch: ppc64el
+            packages: qemu-system-ppc
+          - arch: riscv64
+            packages: qemu-system-misc opensbi
+          - arch: loong64
+            packages: qemu-system-misc qemu-efi-loongarch64
+    steps:
+      # Install git before checking out, so that we get a real git
+      # checkout for run.sh to list files from.
+      - run: apt-get update && apt-get -y install --no-install-recommends mmdebstrap debian-archive-keyring ca-certificates cpio git ${{ matrix.packages }}
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: test/qemu/run.sh ${{ matrix.arch }}
+
   freebsd:
     runs-on: ubuntu-latest
     name: "FreeBSD ${{ matrix.release }}"
