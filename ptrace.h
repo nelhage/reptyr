@@ -22,10 +22,7 @@
 #ifndef PTRACE_H
 #define PTRACE_H
 
-#ifdef __powerpc__
-#include <asm/ptrace.h>
-#endif
-#ifdef __riscv
+#if defined(__linux__) && (defined(__powerpc__) || defined(__riscv))
 #include <asm/ptrace.h>
 #endif
 #include <sys/ptrace.h>
