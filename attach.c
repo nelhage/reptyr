@@ -548,6 +548,17 @@ int steal_cleanup_child(struct steal_pty_state *steal) {
 
     int i;
     for (i = 0; i < steal->master_fds.n; ++i) {
+
+        //NOTE: just assume fd>100 is free, but it not always true
+        if (steal->master_fds.fds[i] > 100){ //ptmx already backup and closed once
+            printf(" === skip close backup fd %d\n", steal->master_fds.fds[i]);
+            continue;
+        }
+
+        printf(" === backup ptmx  fd %d to %d\n", steal->master_fds.fds[i], 100 + steal->master_fds.fds[i]);
+        do_dup2(&steal->child, steal->master_fds.fds[i], 100 + steal->master_fds.fds[i]);
+
+        printf(" === ptrace close fd %d\n", steal->master_fds.fds[i]);
         do_dup2(&steal->child, nullfd, steal->master_fds.fds[i]);
     }
 
